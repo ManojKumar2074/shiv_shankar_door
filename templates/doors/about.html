@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Our Story — Shiv Shankar Door{% endblock %}
+{% block content %}
+
+<div class="page-hero">
+    <div class="container">
+        <span class="section__eyebrow">Our Journey</span>
+        <h1 class="page-hero__title">The Art of<br><em>Fine Doors</em></h1>
+        <p>Crafting entrances that define spaces for over 15 years.</p>
+    </div>
+</div>
+
+<section class="section">
+    <div class="container">
+        <div class="about-story">
+            <div class="about-story__content">
+                <span class="section__eyebrow">Our Beginning</span>
+                <h2 class="section__title">A Legacy of<br>Craftsmanship</h2>
+                <p>Shiv Shankar Door was founded with a singular vision: to transform the humble door from a functional necessity into a statement of luxury, identity, and craftsmanship.</p>
+                <p>Over the years, we have worked with some of the most discerning homeowners, architects, and interior designers across the region — delivering doors that are not just beautiful to look at, but built to last generations.</p>
+                <p>Every door we create carries the weight of tradition and the precision of modern manufacturing. From the selection of materials to the final finishing touch, no detail is too small to matter.</p>
+            </div>
+            <div class="about-story__visual">
+                <div class="about-story__card">
+                    <div class="about-story__stat"><span>15+</span><p>Years of Excellence</p></div>
+                    <div class="about-story__stat"><span>500+</span><p>Projects Completed</p></div>
+                    <div class="about-story__stat"><span>50+</span><p>Door Designs</p></div>
+                    <div class="about-story__stat"><span>100%</span><p>Customer Satisfaction</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section section--dark">
+    <div class="container">
+        <div class="section__header section__header--centered">
+            <span class="section__eyebrow">Philosophy</span>
+            <h2 class="section__title">Our Craftsmanship<br>Philosophy</h2>
+        </div>
+        <div class="philosophy-grid">
+            <div class="philosophy-card">
+                <div class="philosophy-card__icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                </div>
+                <h3>Uncompromised Quality</h3>
+                <p>We source only the finest materials — premium hardwoods, tempered glass, high-grade metals — and subject every piece to rigorous quality control.</p>
+            </div>
+            <div class="philosophy-card">
+                <div class="philosophy-card__icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                </div>
+                <h3>Timeless Design</h3>
+                <p>Our designs are crafted to transcend trends. We create doors that feel contemporary today and will remain elegant decades from now.</p>
+            </div>
+            <div class="philosophy-card">
+                <div class="philosophy-card__icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                </div>
+                <h3>Personal Service</h3>
+                <p>From consultation to installation, our team provides personalized attention at every step, ensuring your door is exactly as you envision it.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="section__header section__header--centered">
+            <span class="section__eyebrow">Materials</span>
+            <h2 class="section__title">Premium Materials</h2>
+            <p class="section__subtitle">We work with only the finest materials to ensure beauty and durability in every door.</p>
+        </div>
+        <div class="materials-grid">
+            <div class="material-card"><h4>Solid Wood</h4><p>Teak, Mahogany, and Oak — the gold standard of door materials.</p></div>
+            <div class="material-card"><h4>Engineered Wood</h4><p>High-density composite for superior stability and modern aesthetics.</p></div>
+            <div class="material-card"><h4>Steel</h4><p>Precision-rolled steel for unmatched security and industrial elegance.</p></div>
+            <div class="material-card"><h4>Glass & Wood</h4><p>Tempered glass inlays that bring light and luxury together beautifully.</p></div>
+            <div class="material-card"><h4>Fibre</h4><p>Weather-resistant, low-maintenance doors for contemporary homes.</p></div>
+            <div class="material-card"><h4>Aluminium</h4><p>Lightweight, rust-proof aluminium for modern and commercial spaces.</p></div>
+        </div>
+    </div>
+</section>
+
+<section class="section section--cta">
+    <div class="container">
+        <div class="cta-block">
+            <div class="cta-block__content">
+                <span class="section__eyebrow">Ready to Begin?</span>
+                <h2 class="cta-block__title">Let's Create<br>Your Perfect Door</h2>
+                <p>Schedule a consultation with our design team or visit our showroom.</p>
+                <div class="cta-block__actions">
+                    <a href="{% url 'contact' %}" class="btn btn--gold">Get in Touch</a>
+                    <a href="{% url 'gallery' %}" class="btn btn--outline-dark">Browse Designs</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

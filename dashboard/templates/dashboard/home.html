@@ -1,0 +1,185 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Dashboard{% endblock %}
+
+{% block breadcrumb %}
+  <span class="dash-breadcrumb__sep">›</span>
+  <span class="dash-breadcrumb__current">Overview</span>
+{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'gallery' %}" target="_blank" class="topbar-btn topbar-btn--outline">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    View Website
+  </a>
+  <a href="{% url 'dashboard_product_add' %}" class="topbar-btn topbar-btn--primary">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add Product
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Greeting -->
+<div class="page-header">
+  <div>
+    <div class="page-header__title">Good day, {{ request.user.get_full_name|default:request.user.username }} 👋</div>
+    <div class="page-header__subtitle">Here's an overview of your showroom.</div>
+  </div>
+</div>
+
+<!-- ── Stat cards ─────────────────────────────────────────── -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-card__icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    </div>
+    <div>
+      <div class="stat-card__value">{{ total_products }}</div>
+      <div class="stat-card__label">Total Products</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    </div>
+    <div>
+      <div class="stat-card__value">{{ featured_count }}</div>
+      <div class="stat-card__label">Featured on Homepage</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    </div>
+    <div>
+      <div class="stat-card__value">{{ new_inquiries }}</div>
+      <div class="stat-card__label">New Inquiries</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card__icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.4 1.13 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14v2.92z"/></svg>
+    </div>
+    <div>
+      <div class="stat-card__value">{{ total_inquiries }}</div>
+      <div class="stat-card__label">Total Inquiries</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Two-column grid ────────────────────────────────────── -->
+<div class="home-grid">
+
+  <!-- Recent Products -->
+  <div class="dash-card">
+    <div class="dash-card__header">
+      <div>
+        <div class="dash-card__title">Recent Products</div>
+        <div class="dash-card__count">Latest additions to your catalogue</div>
+      </div>
+      <a href="{% url 'dashboard_products' %}" class="btn btn--secondary btn--sm">View All</a>
+    </div>
+
+    {% if recent_products %}
+    <ul class="home-product-list">
+      {% for product in recent_products %}
+      <li class="home-product-list__item">
+        <!-- Thumbnail -->
+        <div class="home-product-list__thumb">
+          {% if product.image_main %}
+          <img src="{{ product.image_main.url }}" alt="{{ product.name }}" loading="lazy">
+          {% else %}
+          <div class="home-product-list__thumb-ph">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+          {% endif %}
+        </div>
+        <!-- Info -->
+        <div class="home-product-list__info">
+          <div class="home-product-list__name">{{ product.name }}</div>
+          <div class="home-product-list__meta">{{ product.get_category_display }} · {{ product.get_material_display }}</div>
+        </div>
+        <!-- Right side -->
+        <div class="home-product-list__right">
+          <div class="home-product-list__price">{{ product.get_price_display }}</div>
+          <div class="home-product-list__date">{{ product.created_at|date:"d M" }}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state" style="padding:32px 20px">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <p style="margin-bottom:12px">No products yet.</p>
+      <a href="{% url 'dashboard_product_add' %}" class="btn btn--primary btn--sm">Add your first door</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right column: Inquiries + Category breakdown -->
+  <div>
+
+    <!-- Recent Inquiries -->
+    <div class="dash-card" style="margin-bottom:16px">
+      <div class="dash-card__header">
+        <div>
+          <div class="dash-card__title">Recent Inquiries</div>
+          <div class="dash-card__count">Latest customer messages</div>
+        </div>
+        <a href="{% url 'dashboard_inquiries' %}" class="btn btn--secondary btn--sm">View All</a>
+      </div>
+
+      {% if recent_inquiries %}
+      <ul class="home-inquiry-list">
+        {% for inq in recent_inquiries %}
+        <li class="home-inquiry-list__item">
+          <div class="home-inquiry-list__avatar">{{ inq.name.0|upper }}</div>
+          <div class="home-inquiry-list__info">
+            <div class="home-inquiry-list__name">{{ inq.name }}</div>
+            <div class="home-inquiry-list__phone">{{ inq.phone }}</div>
+          </div>
+          <div class="home-inquiry-list__right">
+            <span class="status-badge status-badge--{{ inq.status }}">{{ inq.get_status_display }}</span>
+            <div class="home-inquiry-list__date">{{ inq.created_at|date:"d M" }}</div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty-state" style="padding:28px 20px">
+        <p>No inquiries yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Products by Category -->
+    <div class="dash-card">
+      <div class="dash-card__header">
+        <div>
+          <div class="dash-card__title">Products by Category</div>
+          <div class="dash-card__count">{{ total_products }} total</div>
+        </div>
+      </div>
+      {% if category_stats and total_products %}
+      <div class="home-cat-bars">
+        {% for stat in category_stats %}
+        <div class="home-cat-bar">
+          <div class="home-cat-bar__top">
+            <span class="home-cat-bar__label">{{ stat.category|title }}</span>
+            <span class="home-cat-bar__count">{{ stat.count }}</span>
+          </div>
+          <div class="home-cat-bar__track">
+            <div class="home-cat-bar__fill" style="width:{% widthratio stat.count total_products 100 %}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state" style="padding:28px 20px"><p>No data yet.</p></div>
+      {% endif %}
+    </div>
+
+  </div>
+</div><!-- /.home-grid -->
+
+{% endblock %}

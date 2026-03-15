@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Shiv Shankar Door — Luxury Door Designs{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── AI Feature mockup with real images ──────────────────── */
+.ai-feature__mockup {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 4/3;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+  display: flex;
+}
+.ai-feature__before,
+.ai-feature__after {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+.ai-feature__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 6s ease;
+}
+.ai-feature__img--before {
+  filter: grayscale(60%) brightness(0.75);
+}
+.ai-feature__mockup:hover .ai-feature__img {
+  transform: scale(1.04);
+}
+/* Gold vertical divider */
+.ai-feature__divider {
+  position: absolute;
+  left: 50%;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: var(--gold, #c9a961);
+  transform: translateX(-50%);
+  z-index: 3;
+  box-shadow: 0 0 12px rgba(201,169,97,0.6);
+}
+/* Before / After labels */
+.ai-feature__panel-label {
+  position: absolute;
+  bottom: 14px; left: 14px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(0,0,0,0.5);
+  padding: 4px 10px;
+  border-radius: 4px;
+  z-index: 4;
+}
+.ai-feature__after .ai-feature__panel-label {
+  background: var(--gold, #c9a961);
+  left: auto;
+  right: 14px;
+}
+/* Floating AI badge */
+.ai-feature__badge {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.75);
+  color: var(--gold, #c9a961);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  z-index: 5;
+  border: 1px solid rgba(201,169,97,0.3);
+  backdrop-filter: blur(4px);
+}
+</style>
+{% endblock %}
+{% block content %}
+
+<section class="hero">
+    <div class="hero__bg"><div class="hero__overlay"></div><div class="hero__pattern"></div></div>
+    <div class="hero__content">
+        <div class="hero__eyebrow"><span class="hero__line"></span><span>Est. in Craftsmanship</span><span class="hero__line"></span></div>
+        <h1 class="hero__title">Where Every<br><em>Entrance</em><br>Tells a Story</h1>
+        <p class="hero__subtitle">Bespoke luxury door designs for homes and spaces that deserve more than ordinary.</p>
+        <div class="hero__actions">
+            <a href="{% url 'gallery' %}" class="btn btn--gold">Explore Collection</a>
+            <a href="{% url 'ai_preview' %}" class="btn btn--outline">Try AI Preview</a>
+        </div>
+        <div class="hero__stats">
+            <div class="hero__stat"><span class="hero__stat-number">{{ total_doors }}+</span><span class="hero__stat-label">Designs</span></div>
+            <div class="hero__stat-divider"></div>
+            <div class="hero__stat"><span class="hero__stat-number">500+</span><span class="hero__stat-label">Installations</span></div>
+            <div class="hero__stat-divider"></div>
+            <div class="hero__stat"><span class="hero__stat-number">15+</span><span class="hero__stat-label">Years</span></div>
+        </div>
+    </div>
+    <div class="hero__scroll"><span>Scroll</span><div class="hero__scroll-line"></div></div>
+</section>
+
+{% if featured_doors %}
+<section class="section section--featured">
+    <div class="container">
+        <div class="section__header">
+            <span class="section__eyebrow">Curated Selection</span>
+            <h2 class="section__title">Featured Collection</h2>
+            <p class="section__subtitle">Our most celebrated designs, chosen for their exceptional craftsmanship and timeless aesthetic.</p>
+        </div>
+        <div class="doors-grid doors-grid--featured">
+            {% for door in featured_doors %}
+            <article class="door-card {% if forloop.first %}door-card--large{% endif %}">
+                <a href="{{ door.get_absolute_url }}" class="door-card__link">
+                    <div class="door-card__image-wrap">
+                        <img src="{{ door.image_main.url }}" alt="{{ door.name }}" class="door-card__image" loading="lazy">
+                        <div class="door-card__overlay"><span class="door-card__view">View Details</span></div>
+                        <span class="door-card__badge">Featured</span>
+                    </div>
+                    <div class="door-card__info">
+                        <span class="door-card__category">{{ door.get_category_display }}</span>
+                        <h3 class="door-card__name">{{ door.name }}</h3>
+                        <span class="door-card__price">{{ door.get_price_display }}</span>
+                    </div>
+                </a>
+            </article>
+            {% endfor %}
+        </div>
+        <div class="section__cta"><a href="{% url 'gallery' %}" class="btn btn--outline-dark">View All Designs</a></div>
+    </div>
+</section>
+{% endif %}
+
+{% if category_data %}
+<section class="section section--categories">
+    <div class="container">
+        <div class="section__header">
+            <span class="section__eyebrow">Browse By Type</span>
+            <h2 class="section__title">Door Collections</h2>
+        </div>
+        <div class="categories-grid">
+            {% for cat in category_data %}
+            <a href="{% url 'gallery' %}?category={{ cat.key }}" class="category-card">
+                <div class="category-card__image-wrap">
+                    {% if cat.image %}<img src="{{ cat.image.url }}" alt="{{ cat.label }}" class="category-card__image" loading="lazy">
+                    {% else %}<div class="category-card__placeholder"></div>{% endif %}
+                    <div class="category-card__overlay"></div>
+                </div>
+                <div class="category-card__info">
+                    <h3 class="category-card__name">{{ cat.label }}</h3>
+                    <span class="category-card__count">{{ cat.count }} Design{% if cat.count != 1 %}s{% endif %}</span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<section class="section section--ai-feature">
+    <div class="container">
+        <div class="ai-feature">
+            <div class="ai-feature__content">
+                <span class="section__eyebrow">Innovation</span>
+                <h2 class="section__title">Visualize Before You Decide</h2>
+                <p class="ai-feature__desc">Our AI-powered preview lets you see exactly how any door looks on your home's entrance — before making a decision.</p>
+                <ul class="ai-feature__steps">
+                    <li><span class="ai-feature__step-num">01</span><div><strong>Upload your entrance photo</strong><p>A clear photo of your home's front entrance</p></div></li>
+                    <li><span class="ai-feature__step-num">02</span><div><strong>Select a door design</strong><p>Browse and choose from our entire collection</p></div></li>
+                    <li><span class="ai-feature__step-num">03</span><div><strong>See the transformation</strong><p>Instant before &amp; after visual comparison</p></div></li>
+                </ul>
+                <a href="{% url 'ai_preview' %}" class="btn btn--gold">Try AI Preview Free</a>
+            </div>
+            <div class="ai-feature__visual">
+                <div class="ai-feature__mockup">
+
+                    {% if featured_doors %}
+                    {% with door=featured_doors.0 %}
+
+                    <!-- BEFORE panel — plain house photo feel, door image desaturated -->
+                    <div class="ai-feature__before">
+                        <img src="{{ door.image_main.url }}" alt="Before" class="ai-feature__img ai-feature__img--before">
+                        <span class="ai-feature__panel-label">Before</span>
+                    </div>
+
+                    <!-- AFTER panel — door image full color, gold tint -->
+                    {% if featured_doors|length > 1 %}
+                    {% with door2=featured_doors.1 %}
+                    <div class="ai-feature__after">
+                        <img src="{{ door2.image_main.url }}" alt="After" class="ai-feature__img">
+                        <span class="ai-feature__panel-label">After</span>
+                    </div>
+                    {% endwith %}
+                    {% else %}
+                    <div class="ai-feature__after">
+                        <img src="{{ door.image_main.url }}" alt="After" class="ai-feature__img">
+                        <span class="ai-feature__panel-label">After</span>
+                    </div>
+                    {% endif %}
+
+                    {% endwith %}
+                    {% else %}
+
+                    <!-- Fallback if no featured doors -->
+                    <div class="ai-feature__before">
+                        <span class="ai-feature__panel-label">Before</span>
+                    </div>
+                    <div class="ai-feature__after">
+                        <span class="ai-feature__panel-label">After</span>
+                    </div>
+
+                    {% endif %}
+
+                    <!-- Gold divider line -->
+                    <div class="ai-feature__divider"></div>
+
+                    <!-- Floating badge -->
+                    <div class="ai-feature__badge">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        AI Preview
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if latest_doors %}
+<section class="section section--latest">
+    <div class="container">
+        <div class="section__header">
+            <span class="section__eyebrow">New Arrivals</span>
+            <h2 class="section__title">Latest Designs</h2>
+        </div>
+        <div class="doors-grid">
+            {% for door in latest_doors %}
+            <article class="door-card">
+                <a href="{{ door.get_absolute_url }}" class="door-card__link">
+                    <div class="door-card__image-wrap">
+                        <img src="{{ door.image_main.url }}" alt="{{ door.name }}" class="door-card__image" loading="lazy">
+                        <div class="door-card__overlay"><span class="door-card__view">View Details</span></div>
+                    </div>
+                    <div class="door-card__info">
+                        <span class="door-card__category">{{ door.get_category_display }}</span>
+                        <h3 class="door-card__name">{{ door.name }}</h3>
+                        <div class="door-card__meta">
+                            <span class="door-card__material">{{ door.get_material_display }}</span>
+                            <span class="door-card__price">{{ door.get_price_display }}</span>
+                        </div>
+                    </div>
+                </a>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<section class="section section--cta">
+    <div class="container">
+        <div class="cta-block">
+            <div class="cta-block__content">
+                <span class="section__eyebrow">Get in Touch</span>
+                <h2 class="cta-block__title">Your Dream Door<br>Awaits</h2>
+                <p>Visit our showroom or reach out for a personalized consultation. Our design experts are ready to help.</p>
+                <div class="cta-block__actions">
+                    <a href="{% url 'contact' %}" class="btn btn--gold">Contact Us</a>
+                    <a href="{{ whatsapp_float_url }}" target="_blank" class="btn btn--whatsapp">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        WhatsApp Us
+                    </a>
+                </div>
+            </div>
+            <div class="cta-block__details">
+                <div class="cta-block__detail">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14h0v2.92z"/></svg>
+                    <div><strong>Call Us</strong><span>{{ business_phone_1 }}</span></div>
+                </div>
+                <div class="cta-block__detail">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <div><strong>Business Hours</strong><span>Mon–Sat: 9am – 7pm</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

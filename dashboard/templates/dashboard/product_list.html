@@ -1,0 +1,176 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Products{% endblock %}
+{% block breadcrumb %}
+  <span class="dash-breadcrumb__sep">›</span>
+  <span class="dash-breadcrumb__current">Products</span>
+{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'gallery' %}" target="_blank" class="topbar-btn topbar-btn--outline">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    Preview
+  </a>
+  <a href="{% url 'dashboard_product_add' %}" class="topbar-btn topbar-btn--primary">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add Product
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header__title">Product Catalogue</div>
+    <div class="page-header__subtitle">Manage your door designs and pricing.</div>
+  </div>
+</div>
+
+<div class="dash-card">
+  <div class="dash-card__header">
+    <div>
+      <div class="dash-card__title">All Products</div>
+      <div class="dash-card__count">{{ total }} product{% if total != 1 %}s{% endif %} found</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="get" id="filterForm">
+    <div class="filter-bar">
+      <div class="filter-search-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="search" value="{{ search }}" placeholder="Search products..." class="filter-search">
+      </div>
+
+      <select name="category" class="filter-select-sm" onchange="this.form.submit()">
+        <option value="">All Categories</option>
+        {% for key, label in categories %}
+        <option value="{{ key }}" {% if current_category == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="material" class="filter-select-sm" onchange="this.form.submit()">
+        <option value="">All Materials</option>
+        {% for key, label in materials %}
+        <option value="{{ key }}" {% if current_material == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="featured" class="filter-select-sm" onchange="this.form.submit()">
+        <option value="">All</option>
+        <option value="1" {% if current_featured == '1' %}selected{% endif %}>⭐ Featured</option>
+        <option value="0" {% if current_featured == '0' %}selected{% endif %}>Not Featured</option>
+      </select>
+
+      <select name="sort" class="filter-select-sm" onchange="this.form.submit()">
+        <option value="-created_at" {% if current_sort == '-created_at' %}selected{% endif %}>Newest First</option>
+        <option value="created_at" {% if current_sort == 'created_at' %}selected{% endif %}>Oldest First</option>
+        <option value="name" {% if current_sort == 'name' %}selected{% endif %}>Name A–Z</option>
+        <option value="-name" {% if current_sort == '-name' %}selected{% endif %}>Name Z–A</option>
+        <option value="price_min" {% if current_sort == 'price_min' %}selected{% endif %}>Price: Low–High</option>
+        <option value="-price_min" {% if current_sort == '-price_min' %}selected{% endif %}>Price: High–Low</option>
+      </select>
+
+      <button type="submit" class="btn btn--secondary btn--sm">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filter
+      </button>
+
+      {% if search or current_category or current_material or current_featured %}
+      <a href="{% url 'dashboard_products' %}" class="btn btn--secondary btn--sm">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Clear
+      </a>
+      {% endif %}
+    </div>
+  </form>
+
+  <!-- Grid -->
+  {% if products %}
+  <div class="products-grid">
+    {% for product in products %}
+    <div class="product-tile" data-id="{{ product.pk }}">
+      <div class="product-tile__img">
+        {% if product.image_main %}
+        <img src="{{ product.image_main.url }}" alt="{{ product.name }}" loading="lazy">
+        {% else %}
+        <div class="product-tile__img-placeholder">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </div>
+        {% endif %}
+        {% if product.is_featured %}
+        <span class="product-tile__featured-badge">⭐ Featured</span>
+        {% endif %}
+      </div>
+      <div class="product-tile__body">
+        <div class="product-tile__cat">{{ product.get_category_display }}</div>
+        <div class="product-tile__name">{{ product.name }}</div>
+        <div class="product-tile__meta">{{ product.get_material_display }} · {{ product.get_finish_type_display }}</div>
+        <div class="product-tile__price">
+          <span>{{ product.get_price_display }}</span>
+          <span style="font-size:0.68rem;color:var(--text-muted);font-weight:400">{{ product.created_at|date:"d M Y" }}</span>
+        </div>
+        <div class="product-tile__actions">
+          <a href="{{ product.get_absolute_url }}" target="_blank" class="btn-icon btn-icon--view" title="View on website">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </a>
+          <a href="{% url 'dashboard_product_edit' product.pk %}" class="btn-icon btn-icon--edit" title="Edit product">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </a>
+          <button class="btn-icon btn-icon--delete" title="Delete product"
+            onclick="confirmDelete({{ product.pk }}, '{{ product.name|escapejs }}')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>
+          <a href="{% url 'dashboard_product_edit' product.pk %}" class="btn btn--secondary btn--sm" style="flex:1;justify-content:center">
+            Edit Details
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if products.has_other_pages %}
+  <div class="dash-pagination">
+    <span>Showing {{ products.start_index }}–{{ products.end_index }} of {{ total }}</span>
+    <div class="dash-pagination__pages">
+      {% if products.has_previous %}
+      <a href="?page={{ products.previous_page_number }}&search={{ search }}&category={{ current_category }}&material={{ current_material }}" class="dash-pagination__btn">←</a>
+      {% endif %}
+      {% for num in products.paginator.page_range %}
+      <a href="?page={{ num }}&search={{ search }}&category={{ current_category }}" class="dash-pagination__btn {% if products.number == num %}active{% endif %}">{{ num }}</a>
+      {% endfor %}
+      {% if products.has_next %}
+      <a href="?page={{ products.next_page_number }}&search={{ search }}&category={{ current_category }}" class="dash-pagination__btn">→</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    <h3>No products found</h3>
+    <p>{% if search or current_category %}Try different filters, or{% else %}Your catalogue is empty.{% endif %}</p>
+    <a href="{% url 'dashboard_product_add' %}" class="btn btn--primary">Add Your First Door</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(id, name) {
+  document.getElementById('deleteProductName').textContent = '"' + name + '"';
+  // Build URL from Django route instead of hard-coding '/dashboard/...'
+  var tmpl = "{% url 'dashboard_product_delete' 0 %}";
+  document.getElementById('deleteForm').action = tmpl.replace('/0/', '/' + id + '/');
+  document.getElementById('deleteModal').classList.add('open');
+}
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.remove('open');
+}
+// Close on overlay click
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+  if (e.target === this) closeDeleteModal();
+});
+</script>
+{% endblock %}

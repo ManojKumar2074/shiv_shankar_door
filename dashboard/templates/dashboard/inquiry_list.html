@@ -1,0 +1,150 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Inquiries{% endblock %}
+{% block breadcrumb %}
+  <span class="dash-breadcrumb__sep">›</span>
+  <span class="dash-breadcrumb__current">Customer Inquiries</span>
+{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'dashboard_home' %}" class="topbar-btn topbar-btn--outline">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-header__title">Customer Inquiries</div>
+    <div class="page-header__subtitle">{{ total }} total · <strong style="color:var(--red)">{{ new_count }} new</strong></div>
+  </div>
+</div>
+
+<div class="dash-card">
+  <div class="dash-card__header">
+    <!-- Filter bar -->
+    <form method="get" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%">
+      <div class="filter-search-wrap" style="max-width:280px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="search" value="{{ search }}" placeholder="Search name, phone..." class="filter-search">
+      </div>
+      {% for key, label in status_choices %}
+      <a href="?status={{ key }}" class="btn btn--sm {% if current_status == key %}btn--primary{% else %}btn--secondary{% endif %}">{{ label }}</a>
+      {% endfor %}
+      {% if current_status or search %}
+      <a href="{% url 'dashboard_inquiries' %}" class="btn btn--secondary btn--sm">Clear</a>
+      {% endif %}
+      <button type="submit" class="btn btn--secondary btn--sm" style="margin-left:auto">Search</button>
+    </form>
+  </div>
+
+  <div class="inquiry-table-wrap">
+    {% if inquiries %}
+    <table class="inquiry-table">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Door Enquired</th>
+          <th>Message</th>
+          <th>Received</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inq in inquiries %}
+        <tr id="row-{{ inq.pk }}">
+          <td>
+            <div class="customer-name">{{ inq.name }}</div>
+            <div class="customer-phone">
+              <a href="tel:{{ inq.phone }}" style="color:var(--gold)">{{ inq.phone }}</a>
+            </div>
+            {% if inq.email %}<div class="customer-phone"><a href="mailto:{{ inq.email }}">{{ inq.email }}</a></div>{% endif %}
+            {% if inq.location %}<div class="customer-phone">📍 {{ inq.location }}</div>{% endif %}
+          </td>
+          <td>
+            {% if inq.door %}
+            <div class="door-name">
+              <a href="{{ inq.door.get_absolute_url }}" target="_blank" style="color:var(--text)">{{ inq.door.name }}</a>
+            </div>
+            <div class="customer-phone">{{ inq.door.get_category_display }}</div>
+            {% else %}
+            <span style="color:var(--text-muted);font-size:0.78rem">General Inquiry</span>
+            {% endif %}
+          </td>
+          <td><div class="message-preview" title="{{ inq.message }}">{{ inq.message }}</div></td>
+          <td><div class="date">{{ inq.created_at|date:"d M Y" }}<br>{{ inq.created_at|time:"g:i A" }}</div></td>
+          <td>
+            <span class="status-badge status-badge--{{ inq.status }}" id="badge-{{ inq.pk }}">{{ inq.get_status_display }}</span>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center">
+              <form method="post" action="{% url 'dashboard_inquiry_status' inq.pk %}" id="form-{{ inq.pk }}">
+                {% csrf_token %}
+                <select name="status" class="status-select" onchange="updateStatus({{ inq.pk }}, this.value)">
+                  {% for key, label in status_choices %}
+                  <option value="{{ key }}" {% if inq.status == key %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+              {% if inq.phone %}
+              <a href="https://wa.me/91{{ inq.phone|cut:'+' }}?text=Hello {{ inq.name }}, regarding your inquiry about {% if inq.door %}{{ inq.door.name }}{% else %}our doors{% endif %}..."
+                 target="_blank" class="btn-icon" title="Reply on WhatsApp" style="color:#25d366;border-color:#25d366">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if inquiries.has_other_pages %}
+    <div class="dash-pagination">
+      <span>Showing {{ inquiries.start_index }}–{{ inquiries.end_index }} of {{ total }}</span>
+      <div class="dash-pagination__pages">
+        {% if inquiries.has_previous %}<a href="?page={{ inquiries.previous_page_number }}&status={{ current_status }}" class="dash-pagination__btn">←</a>{% endif %}
+        {% for num in inquiries.paginator.page_range %}
+        <a href="?page={{ num }}&status={{ current_status }}" class="dash-pagination__btn {% if inquiries.number == num %}active{% endif %}">{{ num }}</a>
+        {% endfor %}
+        {% if inquiries.has_next %}<a href="?page={{ inquiries.next_page_number }}&status={{ current_status }}" class="dash-pagination__btn">→</a>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <h3>No inquiries found</h3>
+      <p>{% if current_status or search %}Try different filters{% else %}Customer inquiries will appear here{% endif %}</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const STATUS_COLORS = {
+  'new': 'status-badge--new',
+  'contacted': 'status-badge--contacted',
+  'quoted': 'status-badge--quoted',
+  'closed': 'status-badge--closed'
+};
+
+function updateStatus(pk, status) {
+  const form = document.getElementById('form-' + pk);
+  const data = new FormData(form);
+  fetch(form.action, {
+    method: 'POST',
+    body: data,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      const badge = document.getElementById('badge-' + pk);
+      // Remove old class, add new
+      Object.values(STATUS_COLORS).forEach(c => badge.classList.remove(c));
+      badge.classList.add(STATUS_COLORS[d.status] || '');
+      badge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    }
+  }).catch(() => form.submit());
+}
+</script>
+{% endblock %}

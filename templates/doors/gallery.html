@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Collection — Shiv Shankar Door{% endblock %}
+{% block content %}
+
+<div class="page-hero page-hero--short">
+    <div class="container">
+        <span class="section__eyebrow">Our Work</span>
+        <h1 class="page-hero__title">Door Collection</h1>
+        <p>Explore our complete range of luxury door designs.</p>
+    </div>
+</div>
+
+<section class="gallery-section">
+    <div class="container">
+        <!-- Filter Panel -->
+        <div class="filter-panel">
+            <form method="get" id="filterForm">
+                <div class="filter-panel__top">
+                    <div class="filter-panel__search">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" name="search" value="{{ current_search }}" placeholder="Search designs..." class="filter-search">
+                    </div>
+                    <div class="filter-panel__selects">
+                        <select name="category" class="filter-select" onchange="this.form.submit()">
+                            <option value="">All Categories</option>
+                            {% for key, label in categories %}
+                            <option value="{{ key }}" {% if current_category == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="material" class="filter-select" onchange="this.form.submit()">
+                            <option value="">All Materials</option>
+                            {% for key, label in materials %}
+                            <option value="{{ key }}" {% if current_material == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="finish" class="filter-select" onchange="this.form.submit()">
+                            <option value="">All Finishes</option>
+                            {% for key, label in finishes %}
+                            <option value="{{ key }}" {% if current_finish == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-panel__actions">
+                    <button type="submit" class="btn btn--gold btn--sm">Apply Filters</button>
+                    {% if current_category or current_material or current_finish or current_search %}
+                    <a href="{% url 'gallery' %}" class="btn btn--outline-dark btn--sm">Clear All</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <!-- Results Header -->
+        <div class="gallery-results-header">
+            <p class="gallery-count"><strong>{{ total_results }}</strong> Design{% if total_results != 1 %}s{% endif %} Found</p>
+        </div>
+
+        <!-- Grid -->
+        {% if doors %}
+        <div class="doors-grid">
+            {% for door in doors %}
+            <article class="door-card">
+                <a href="{{ door.get_absolute_url }}" class="door-card__link">
+                    <div class="door-card__image-wrap">
+                        <img src="{{ door.image_main.url }}" alt="{{ door.name }}" class="door-card__image" loading="lazy">
+                        <div class="door-card__overlay"><span class="door-card__view">View Details</span></div>
+                        {% if door.is_featured %}<span class="door-card__badge">Featured</span>{% endif %}
+                    </div>
+                    <div class="door-card__info">
+                        <span class="door-card__category">{{ door.get_category_display }}</span>
+                        <h3 class="door-card__name">{{ door.name }}</h3>
+                        <div class="door-card__meta">
+                            <span class="door-card__material">{{ door.get_material_display }}</span>
+                            <span class="door-card__price">{{ door.get_price_display }}</span>
+                        </div>
+                    </div>
+                </a>
+            </article>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if doors.has_other_pages %}
+        <div class="pagination">
+            {% if doors.has_previous %}
+            <a href="?page={{ doors.previous_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_material %}&material={{ current_material }}{% endif %}" class="pagination__btn">←</a>
+            {% endif %}
+            {% for num in doors.paginator.page_range %}
+            <a href="?page={{ num }}" class="pagination__btn {% if doors.number == num %}active{% endif %}">{{ num }}</a>
+            {% endfor %}
+            {% if doors.has_next %}
+            <a href="?page={{ doors.next_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}" class="pagination__btn">→</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+            <h3>No doors found</h3>
+            <p>Try adjusting your filters or <a href="{% url 'gallery' %}">browse all designs</a>.</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}
+{% block extra_js %}
+{% comment %}Price range slider removed{% endcomment %}
+{% endblock %}

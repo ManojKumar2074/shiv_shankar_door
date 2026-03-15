@@ -1,0 +1,734 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}AI Door Preview — Shiv Shankar Door{% endblock %}
+
+{% block content %}
+
+<div class="page-hero page-hero--short">
+  <div class="container">
+    <span class="section__eyebrow">Technology</span>
+    <h1 class="page-hero__title">AI Door Preview</h1>
+    <p>Upload your entrance photo, mark where your door is, and see any design placed on it instantly.</p>
+  </div>
+</div>
+
+<section class="ai-preview-section">
+  <div class="container">
+
+    <div class="ai-preview-layout{% if preview_result %} ai-preview-layout--result{% endif %}">
+
+      <!-- ══════════════════════════════
+           LEFT — Upload + Draw + Select
+           ══════════════════════════════ -->
+      <div class="ai-preview-form-wrap">
+
+        <!-- Step indicators -->
+        <div class="ai-preview-steps">
+          <div class="ai-step ai-step--active" id="step1-ind">
+            <span class="ai-step__num">1</span><span>Upload Photo</span>
+          </div>
+          <div class="ai-step__arrow">→</div>
+          <div class="ai-step" id="step2-ind">
+            <span class="ai-step__num">2</span><span>Mark Door Area</span>
+          </div>
+          <div class="ai-step__arrow">→</div>
+          <div class="ai-step" id="step3-ind">
+            <span class="ai-step__num">3</span><span>Select Design</span>
+          </div>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="ai-form" id="aiForm">
+          {% csrf_token %}
+          <!-- Hidden rect fields — filled by JS as percentages -->
+          <input type="hidden" name="rect_x" id="rectX">
+          <input type="hidden" name="rect_y" id="rectY">
+          <input type="hidden" name="rect_w" id="rectW">
+          <input type="hidden" name="rect_h" id="rectH">
+
+          <!-- STEP 1: Upload -->
+          <div class="ai-form__step" id="step1">
+            <label class="form-label">
+              <span class="ai-form__step-badge">1</span>
+              Upload Your Entrance Photo
+            </label>
+            <div class="file-upload" id="fileUpload">
+              <input type="file" name="house_image" id="houseImageInput" accept="image/*" required>
+              <div class="file-upload__ui" id="uploadUI">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <strong>Click to upload or drag &amp; drop</strong>
+                <span>JPG, PNG up to 10MB</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 2: Draw rectangle -->
+          <div class="ai-form__step" id="step2" style="display:none">
+            <label class="form-label">
+              <span class="ai-form__step-badge">2</span>
+              Draw a Box Around Your Door
+              <span class="ai-form__step-hint">Click and drag directly on your photo below</span>
+            </label>
+
+            <div class="ai-canvas-wrap" id="canvasWrap">
+              <canvas id="drawCanvas"></canvas>
+              <div class="ai-canvas-hint" id="canvasHint">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2"/>
+                </svg>
+                <span>Drag to mark your door area</span>
+              </div>
+            </div>
+
+            <div class="ai-canvas-actions">
+              <button type="button" class="btn btn--outline-dark btn--sm" id="redrawBtn" style="display:none">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="1 4 1 10 7 10"/>
+                  <path d="M3.51 15a9 9 0 1 0 .49-4.95"/>
+                </svg>
+                Redraw
+              </button>
+              <div class="ai-canvas-status" id="canvasStatus">No area selected yet</div>
+            </div>
+          </div>
+
+          <!-- STEP 3: Select door + Submit -->
+          <div class="ai-form__step" id="step3" style="display:none">
+            <label class="form-label">
+              <span class="ai-form__step-badge">3</span>
+              Select a Door Design
+            </label>
+            <select name="door_id" id="doorSelect" required class="filter-select"
+                    style="width:100%;margin-bottom:16px">
+              <option value="">— Choose a door —</option>
+              {% for door in doors %}
+              <option value="{{ door.pk }}">{{ door.name }} — {{ door.get_category_display }}</option>
+              {% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn--gold btn--lg" style="width:100%"
+                    id="submitBtn" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              Generate Preview
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+      <!-- ══════════════════════════════
+           RIGHT — Result
+           ══════════════════════════════ -->
+      <div class="ai-preview-result-wrap">
+        {% if preview_result %}
+        <div class="ai-result">
+
+          <!-- Header -->
+          <div class="ai-result__header">
+            <div>
+              <h3 class="ai-result__title">Preview Result</h3>
+              <p class="ai-result__subtitle">{{ preview_result.door.name }} on your entrance</p>
+            </div>
+            <span class="ai-result__badge">✓ Generated</span>
+          </div>
+
+          <!-- Side by side Before / After — click to open lightbox -->
+          <div class="ai-result__images">
+
+            <div class="ai-result__img-block" title="Click to view full size">
+              <div class="ai-result__img-label ai-result__img-label--before">Before</div>
+              <img src="{{ preview_result.house_image.url }}" alt="Original entrance">
+              <div class="ai-result__zoom-hint">🔍 Click to enlarge</div>
+            </div>
+
+            <div class="ai-result__img-block ai-result__img-block--after" title="Click to view full size">
+              <div class="ai-result__img-label ai-result__img-label--after">After</div>
+              {% if preview_result.preview_image %}
+              <img src="{{ preview_result.preview_image.url }}" alt="With {{ preview_result.door.name }}">
+              {% else %}
+              <div class="ai-result__processing"><p>Processing…</p></div>
+              {% endif %}
+              <div class="ai-result__zoom-hint">🔍 Click to enlarge</div>
+            </div>
+
+          </div>
+
+          <!-- Actions -->
+          <div class="ai-result__actions">
+            <a href="{% url 'door_detail' preview_result.door.pk %}" class="btn btn--gold btn--lg" style="flex:1;text-align:center">
+              View Door Details
+            </a>
+            <a href="{{ whatsapp_float_url }}" target="_blank" class="btn btn--whatsapp btn--lg" style="flex:1;text-align:center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+              Inquire on WhatsApp
+            </a>
+          </div>
+        </div>
+
+        {% else %}
+        <div class="ai-placeholder">
+          <div class="ai-placeholder__visual">
+            <svg width="110" height="110" viewBox="0 0 100 100" fill="none"
+                 stroke="currentColor" stroke-width="1.5" opacity="0.25">
+              <path d="M10 50 L50 10 L90 50 L90 90 L10 90 Z"/>
+              <rect x="35" y="58" width="30" height="32"/>
+              <rect x="42" y="65" width="7" height="7" stroke-dasharray="2 1"/>
+              <rect x="51" y="65" width="7" height="7" stroke-dasharray="2 1"/>
+            </svg>
+          </div>
+          <h3>Your Preview Will Appear Here</h3>
+          <p>Upload your entrance photo, draw a box over your door, choose a design and hit Generate.</p>
+        </div>
+        {% endif %}
+      </div>
+
+    </div><!-- /.ai-preview-layout -->
+
+    <!-- How it works -->
+    <div class="ai-how-it-works">
+      <h3>How It Works</h3>
+      <div class="ai-how-grid">
+        <div class="ai-how-card">
+          <div class="ai-how-card__icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
+          <h4>Upload Your Photo</h4>
+          <p>Take a clear photo of your home entrance in good natural lighting.</p>
+        </div>
+        <div class="ai-how-card">
+          <div class="ai-how-card__icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2"/>
+              <line x1="8" y1="12" x2="16" y2="12"/>
+              <line x1="12" y1="8" x2="12" y2="16"/>
+            </svg>
+          </div>
+          <h4>Mark Your Door</h4>
+          <p>Draw a box exactly where your current door is in the photo.</p>
+        </div>
+        <div class="ai-how-card">
+          <div class="ai-how-card__icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5"/>
+              <path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <h4>Choose a Design</h4>
+          <p>Pick any door from our collection to place on your entrance.</p>
+        </div>
+        <div class="ai-how-card">
+          <div class="ai-how-card__icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <h4>See the Result</h4>
+          <p>Get a side-by-side before &amp; after comparison instantly.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<!-- ── Lightbox modal ───────────────────────────────── -->
+<div class="ai-lightbox" id="aiLightbox" role="dialog" aria-modal="true">
+  <div class="ai-lightbox__backdrop" id="lbBackdrop"></div>
+  <div class="ai-lightbox__box">
+    <button class="ai-lightbox__close" id="lbClose" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <div class="ai-lightbox__images">
+      <div class="ai-lightbox__panel">
+        <span class="ai-lightbox__panel-label ai-lightbox__panel-label--before">Before</span>
+        <img id="lbBeforeImg" src="" alt="Before">
+      </div>
+      <div class="ai-lightbox__panel ai-lightbox__panel--after">
+        <span class="ai-lightbox__panel-label ai-lightbox__panel-label--after">After</span>
+        <img id="lbAfterImg" src="" alt="After">
+      </div>
+    </div>
+    <div class="ai-lightbox__footer">
+      <span class="ai-lightbox__footer-title" id="lbTitle"></span>
+      <span class="ai-lightbox__footer-hint">Click outside or press Esc to close</span>
+    </div>
+  </div>
+</div>
+
+</section>
+
+<style>
+.ai-form__step { margin-bottom: 20px; }
+.ai-form__step-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--gold); color: #fff;
+  font-size: 0.72rem; font-weight: 700;
+  margin-right: 8px; flex-shrink: 0;
+}
+.ai-form__step-hint {
+  display: block; font-size: 0.75rem; color: var(--text-light);
+  font-weight: 400; margin-top: 3px; margin-left: 30px;
+}
+.ai-step--active .ai-step__num { background: var(--gold) !important; color: #fff !important; }
+.ai-step--active span:last-child { color: var(--black) !important; font-weight: 600; }
+
+.ai-canvas-wrap {
+  position: relative; display: inline-block; width: 100%;
+  border: 2px dashed var(--border); border-radius: 8px;
+  overflow: hidden; cursor: crosshair; background: var(--beige);
+  user-select: none;
+}
+.ai-canvas-wrap canvas { display: block; width: 100%; height: auto; }
+.ai-canvas-hint {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; color: var(--text-light); font-size: 0.85rem;
+  pointer-events: none; background: rgba(232,228,218,0.55);
+  transition: opacity 0.3s;
+}
+.ai-canvas-hint.hidden { opacity: 0; }
+.ai-canvas-actions {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-top: 8px; min-height: 32px;
+}
+.ai-canvas-status { font-size: 0.75rem; color: var(--text-light); }
+.ai-canvas-status.ready { color: #1a7a4a; font-weight: 600; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Result panel ────────────────────────────────────── */
+.ai-result {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ai-result__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+.ai-result__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--black);
+}
+.ai-result__subtitle {
+  font-size: 0.82rem;
+  color: var(--text-light);
+  margin: 0;
+}
+.ai-result__badge {
+  background: #e8f5ee;
+  color: #1a7a4a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+/* Stacked full-width images */
+.ai-result__images {
+  padding: 16px 24px 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ai-result__img-block {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+  cursor: zoom-in;
+}
+.ai-result__img-block img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.2s;
+}
+.ai-result__img-block:hover img { transform: scale(1.02); }
+.ai-result__img-block--after {
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+}
+.ai-result__img-label {
+  position: absolute;
+  top: 10px; left: 10px;
+  font-size: 0.68rem; font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 10px; border-radius: 4px; z-index: 2;
+}
+.ai-result__img-label--before { background: rgba(0,0,0,0.55); color: #fff; }
+.ai-result__img-label--after  { background: var(--gold); color: #fff; }
+.ai-result__zoom-hint {
+  position: absolute; bottom: 10px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.6); color: #fff;
+  font-size: 0.68rem; padding: 4px 10px; border-radius: 20px;
+  white-space: nowrap; opacity: 0; transition: opacity 0.2s; pointer-events: none;
+}
+.ai-result__img-block:hover .ai-result__zoom-hint { opacity: 1; }
+.ai-preview-layout--result { grid-template-columns: 1fr !important; }
+.ai-preview-layout--result .ai-preview-form-wrap { display: none; }
+.ai-preview-layout--result .ai-preview-result-wrap {
+  width: 100%; max-width: 900px; margin: 0 auto;
+}
+.ai-result__actions { display: flex; gap: 12px; padding: 16px 24px 20px; }
+@media (max-width: 640px) {
+  .ai-result__images { grid-template-columns: 1fr; }
+  .ai-result__actions { flex-direction: column; }
+}
+
+/* ── Lightbox modal ──────────────────────────────────── */
+.ai-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.ai-lightbox.open { display: flex; }
+
+/* blurred dark backdrop */
+.ai-lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10,10,10,0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+/* modal box */
+.ai-lightbox__box {
+  position: relative;
+  z-index: 1;
+  background: #111;
+  border-radius: 14px;
+  overflow: hidden;
+  max-width: 1100px;
+  width: 100%;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  animation: lbIn 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes lbIn {
+  from { opacity:0; transform: scale(0.93); }
+  to   { opacity:1; transform: scale(1); }
+}
+
+/* close button */
+.ai-lightbox__close {
+  position: absolute;
+  top: 14px; right: 14px;
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,0.12);
+  border: none; border-radius: 50%;
+  color: #fff; font-size: 1.1rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 10;
+  transition: background 0.2s;
+}
+.ai-lightbox__close:hover { background: rgba(255,255,255,0.25); }
+
+/* images side by side */
+.ai-lightbox__images {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.ai-lightbox__panel {
+  position: relative;
+}
+.ai-lightbox__panel img {
+  width: 100%;
+  height: auto;
+  max-height: 80vh;
+  object-fit: contain;
+  display: block;
+  background: #111;
+}
+.ai-lightbox__panel-label {
+  position: absolute;
+  top: 14px; left: 14px;
+  font-size: 0.7rem; font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 5px 12px;
+  border-radius: 4px;
+}
+.ai-lightbox__panel-label--before {
+  background: rgba(0,0,0,0.6); color: #fff;
+}
+.ai-lightbox__panel-label--after {
+  background: var(--gold); color: #fff;
+}
+
+/* divider line between panels */
+.ai-lightbox__panel--after {
+  border-left: 2px solid var(--gold);
+}
+
+/* bottom bar */
+.ai-lightbox__footer {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1a1a1a;
+}
+.ai-lightbox__footer-title {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.ai-lightbox__footer-hint {
+  color: rgba(255,255,255,0.4);
+  font-size: 0.75rem;
+}
+
+/* click hint on images */
+.ai-result__img-block { cursor: zoom-in; }
+
+@media (max-width: 640px) {
+  .ai-lightbox__images { grid-template-columns: 1fr; }
+  .ai-lightbox__panel img { max-height: 40vh; }
+  .ai-lightbox__panel--after { border-left: none; border-top: 2px solid var(--gold); }
+  .ai-lightbox { padding: 12px; }
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const fileInput    = document.getElementById('houseImageInput');
+  const uploadUI     = document.getElementById('uploadUI');
+  const step2El      = document.getElementById('step2');
+  const step3El      = document.getElementById('step3');
+  const step2Ind     = document.getElementById('step2-ind');
+  const step3Ind     = document.getElementById('step3-ind');
+  const canvas       = document.getElementById('drawCanvas');
+  const ctx          = canvas.getContext('2d');
+  const canvasHint   = document.getElementById('canvasHint');
+  const canvasStatus = document.getElementById('canvasStatus');
+  const redrawBtn    = document.getElementById('redrawBtn');
+  const submitBtn    = document.getElementById('submitBtn');
+  const doorSelect   = document.getElementById('doorSelect');
+  const rectXInput   = document.getElementById('rectX');
+  const rectYInput   = document.getElementById('rectY');
+  const rectWInput   = document.getElementById('rectW');
+  const rectHInput   = document.getElementById('rectH');
+
+  let img = new Image();
+  let isDrawing = false;
+  let startX, startY, currentRect = null;
+  let naturalW, naturalH;
+
+  /* ── Step 1: File chosen ───────────────────────────── */
+  fileInput.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      img.onload = function () {
+        naturalW = img.naturalWidth;
+        naturalH = img.naturalHeight;
+        const maxW = Math.min(520, img.naturalWidth);
+        const scale = maxW / img.naturalWidth;
+        canvas.width  = maxW;
+        canvas.height = Math.round(img.naturalHeight * scale);
+        drawImage();
+        step2El.style.display = 'block';
+        step3El.style.display = 'block';
+        step2Ind.classList.add('ai-step--active');
+        step3Ind.classList.add('ai-step--active');
+        uploadUI.innerHTML = `
+          <img src="${e.target.result}"
+               style="max-height:48px;border-radius:4px;border:1px solid var(--border);margin-bottom:4px;">
+          <span style="font-size:0.75rem;color:var(--text-muted)">${file.name}</span>`;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  /* ── Drawing helpers ───────────────────────────────── */
+  function drawImage() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    if (currentRect) drawRect(currentRect);
+  }
+
+  function drawRect(r) {
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(r.x, r.y, r.w, r.h);
+    ctx.drawImage(img, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = '#c9a961';
+    ctx.lineWidth   = 2.5;
+    ctx.setLineDash([]);
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+    const hs = 8;
+    ctx.fillStyle = '#c9a961';
+    [[r.x,r.y],[r.x+r.w,r.y],[r.x,r.y+r.h],[r.x+r.w,r.y+r.h]].forEach(function(p){
+      ctx.fillRect(p[0]-hs/2, p[1]-hs/2, hs, hs);
+    });
+    var pxW = Math.round((r.w / canvas.width)  * naturalW);
+    var pxH = Math.round((r.h / canvas.height) * naturalH);
+    ctx.fillStyle = '#c9a961';
+    ctx.font = 'bold 11px sans-serif';
+    var labelY = r.y - 6 < 12 ? r.y + 14 : r.y - 6;
+    ctx.fillText(pxW + ' \u00d7 ' + pxH + ' px', r.x + 4, labelY);
+  }
+
+  function getPos(e) {
+    var rect = canvas.getBoundingClientRect();
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left)  * (canvas.width  / rect.width),
+      y: (clientY - rect.top)   * (canvas.height / rect.height),
+    };
+  }
+
+  /* ── Mouse / touch events ──────────────────────────── */
+  canvas.addEventListener('mousedown', function(e){ e.preventDefault(); var p=getPos(e); startX=p.x; startY=p.y; isDrawing=true; canvasHint.classList.add('hidden'); });
+  canvas.addEventListener('touchstart', function(e){ e.preventDefault(); var p=getPos(e); startX=p.x; startY=p.y; isDrawing=true; canvasHint.classList.add('hidden'); }, {passive:false});
+
+  canvas.addEventListener('mousemove', function(e){ if(!isDrawing) return; var p=getPos(e); var r={x:Math.min(startX,p.x),y:Math.min(startY,p.y),w:Math.abs(p.x-startX),h:Math.abs(p.y-startY)}; drawImage(); if(r.w>5&&r.h>5) drawRect(r); });
+  canvas.addEventListener('touchmove', function(e){ e.preventDefault(); if(!isDrawing) return; var p=getPos(e); var r={x:Math.min(startX,p.x),y:Math.min(startY,p.y),w:Math.abs(p.x-startX),h:Math.abs(p.y-startY)}; drawImage(); if(r.w>5&&r.h>5) drawRect(r); }, {passive:false});
+
+  function finishDraw(endPos) {
+    isDrawing = false;
+    var r = {x:Math.min(startX,endPos.x), y:Math.min(startY,endPos.y), w:Math.abs(endPos.x-startX), h:Math.abs(endPos.y-startY)};
+    if(r.w < 10 || r.h < 10){
+      canvasStatus.textContent = 'Too small — drag a bigger area';
+      canvasStatus.classList.remove('ready');
+      currentRect = null; updateHidden(null); return;
+    }
+    currentRect = r; drawImage();
+    var pctX = (r.x/canvas.width)*100;
+    var pctY = (r.y/canvas.height)*100;
+    var pctW = (r.w/canvas.width)*100;
+    var pctH = (r.h/canvas.height)*100;
+    updateHidden({x:pctX,y:pctY,w:pctW,h:pctH});
+    canvasStatus.textContent = '✓ Door area selected — now choose a design below';
+    canvasStatus.classList.add('ready');
+    redrawBtn.style.display = 'inline-flex';
+    checkSubmit();
+  }
+
+  canvas.addEventListener('mouseup',  function(e){ if(!isDrawing) return; finishDraw(getPos(e)); });
+  canvas.addEventListener('touchend', function(e){
+    if(!isDrawing) return;
+    var rect=canvas.getBoundingClientRect();
+    var t=e.changedTouches[0];
+    finishDraw({x:(t.clientX-rect.left)*(canvas.width/rect.width), y:(t.clientY-rect.top)*(canvas.height/rect.height)});
+  });
+
+  /* ── Redraw ────────────────────────────────────────── */
+  redrawBtn.addEventListener('click', function(){
+    currentRect=null; updateHidden(null); drawImage();
+    canvasStatus.textContent='No area selected yet';
+    canvasStatus.classList.remove('ready');
+    redrawBtn.style.display='none';
+    canvasHint.classList.remove('hidden');
+    checkSubmit();
+  });
+
+  doorSelect.addEventListener('change', checkSubmit);
+
+  // Auto-select door if ?door=ID is in the URL (coming from door detail page)
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var doorId = params.get('door');
+    if (doorId) {
+      doorSelect.value = doorId;
+      doorSelect.style.transition = 'box-shadow 0.4s';
+      doorSelect.style.boxShadow  = '0 0 0 3px rgba(201,169,97,0.45)';
+      setTimeout(function(){ doorSelect.style.boxShadow = ''; }, 1800);
+      checkSubmit();
+    }
+  })();
+
+  function checkSubmit(){ submitBtn.disabled = !(currentRect && doorSelect.value); }
+
+  function updateHidden(r){
+    rectXInput.value = r ? r.x.toFixed(4) : '';
+    rectYInput.value = r ? r.y.toFixed(4) : '';
+    rectWInput.value = r ? r.w.toFixed(4) : '';
+    rectHInput.value = r ? r.h.toFixed(4) : '';
+  }
+
+  /* ── Form submit ───────────────────────────────────── */
+  document.getElementById('aiForm').addEventListener('submit', function(e){
+    if(!currentRect){ e.preventDefault(); alert('Please draw a box over your door first.'); return; }
+    if(!doorSelect.value){ e.preventDefault(); alert('Please select a door design.'); return; }
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Generating\u2026';
+  });
+
+})();
+
+  /* ── Lightbox ──────────────────────────────────────── */
+  (function () {
+    var lightbox   = document.getElementById('aiLightbox');
+    var lbClose    = document.getElementById('lbClose');
+    var lbBackdrop = document.getElementById('lbBackdrop');
+    var lbBefore   = document.getElementById('lbBeforeImg');
+    var lbAfter    = document.getElementById('lbAfterImg');
+    var lbTitle    = document.getElementById('lbTitle');
+
+    function openLightbox() {
+      // Grab src from result images
+      var beforeImg = document.querySelector('.ai-result__img-block:first-child img');
+      var afterImg  = document.querySelector('.ai-result__img-block--after img');
+      var subtitle  = document.querySelector('.ai-result__subtitle');
+      if (!beforeImg || !afterImg) return;
+      lbBefore.src = beforeImg.src;
+      lbAfter.src  = afterImg.src;
+      lbTitle.textContent = subtitle ? subtitle.textContent : '';
+      lightbox.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    // Attach click to both result images
+    document.querySelectorAll('.ai-result__img-block img').forEach(function (img) {
+      img.addEventListener('click', openLightbox);
+    });
+
+    lbClose.addEventListener('click', closeLightbox);
+    lbBackdrop.addEventListener('click', closeLightbox);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,485 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ page_title|default:'Product' }}{% endblock %}
+
+{% block breadcrumb %}
+  <span class="dash-breadcrumb__sep">›</span>
+  <a href="{% url 'dashboard_products' %}">Products</a>
+  <span class="dash-breadcrumb__sep">›</span>
+  <span class="dash-breadcrumb__current">{% if action == 'edit' %}Edit{% else %}Add New{% endif %}</span>
+{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{% url 'dashboard_products' %}" class="topbar-btn topbar-btn--outline">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+    </svg>
+    Back to Products
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<style>
+/* ── Gold Pill Button System ─────────────────────────────────────────── */
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Hide the real checkbox */
+.pill-group input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* The pill label */
+.pill-group label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--gold-border, #e8d9b0);
+  background: #fff;
+  color: var(--text-muted, #7a7368);
+  font-size: .78rem;
+  font-weight: 500;
+  font-family: var(--font-body, 'DM Sans', sans-serif);
+  cursor: pointer;
+  transition: all .18s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.pill-group label:hover {
+  border-color: var(--gold, #c9a961);
+  color: var(--gold-dark, #a8883e);
+  background: var(--gold-pale, #faf6ec);
+}
+
+/* Checked state — gold fill */
+.pill-group input[type="checkbox"]:checked + label {
+  background: var(--gold, #c9a961);
+  border-color: var(--gold, #c9a961);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(201,169,97,.30);
+}
+
+/* Tick icon inside checked pill */
+.pill-group input[type="checkbox"]:checked + label::before {
+  content: '';
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  flex-shrink: 0;
+}
+
+/* Wider pills for "as per customer request" type options */
+.pill-group label.pill--wide {
+  font-style: italic;
+  color: var(--text-light, #a09890);
+  border-style: dashed;
+}
+.pill-group input[type="checkbox"]:checked + label.pill--wide {
+  font-style: normal;
+  color: #fff;
+}
+</style>
+
+<div class="page-header">
+  <div>
+    <div class="page-header__title">
+      {% if action == 'edit' %}Edit — {{ product.name }}{% else %}Add New Product{% endif %}
+    </div>
+    <div class="page-header__subtitle">
+      {% if action == 'edit' %}Update details, pricing and photos for this door design.
+      {% else %}Fill in the details below to add a new door to your catalogue.{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="dash-card">
+  <form method="post" enctype="multipart/form-data" class="dash-form" novalidate>
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="pf-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="pf-layout">
+
+      <!-- ══════════════════════════════════════
+           LEFT — Main fields
+           ══════════════════════════════════════ -->
+      <div class="pf-main">
+
+        <!-- 1. Basic Information -->
+        <div class="pf-section">
+          <div class="pf-section__head">
+            <div class="pf-section__num">1</div>
+            <div class="pf-section__title">Basic Information</div>
+          </div>
+
+          <div class="pf-row pf-row--2">
+            <div class="pf-field">
+              <label class="pf-label pf-label--req" for="id_name">Product Name</label>
+              {{ form.name }}
+              {% if form.name.errors %}<div class="field-error">{{ form.name.errors }}</div>{% endif %}
+            </div>
+            <div class="pf-field">
+              <label class="pf-label pf-label--req" for="id_material">Material Type</label>
+              {{ form.material }}
+              {% if form.material.errors %}<div class="field-error">{{ form.material.errors }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="pf-row">
+            <div class="pf-field">
+              <label class="pf-label pf-label--req" for="id_description">Description</label>
+              {{ form.description }}
+              {% if form.description.errors %}<div class="field-error">{{ form.description.errors }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Door Category -->
+        <div class="pf-section">
+          <div class="pf-section__head">
+            <div class="pf-section__num">2</div>
+            <div class="pf-section__title">Door Category</div>
+            <span class="pf-section__sub">Select all that apply</span>
+          </div>
+          <div class="pf-field">
+            <div class="pill-group" id="pill-category">
+              {% for widget in form.category %}
+                {{ widget.tag }}
+                <label for="{{ widget.id_for_label }}">{{ widget.choice_label }}</label>
+              {% endfor %}
+            </div>
+            {% if form.category.errors %}<div class="field-error" style="margin-top:6px">{{ form.category.errors }}</div>{% endif %}
+          </div>
+        </div>
+
+        <!-- 3. Dimensions -->
+        <div class="pf-section">
+          <div class="pf-section__head">
+            <div class="pf-section__num">3</div>
+            <div class="pf-section__title">Available Dimensions</div>
+            <span class="pf-section__sub">Select all sizes you stock</span>
+          </div>
+
+          <!-- Height -->
+          <div class="pf-field" style="margin-bottom:18px">
+            <label class="pf-label pf-label--req">Height <span style="font-weight:400;color:var(--text-muted);font-size:.72rem">(inches)</span></label>
+            <div class="pill-group" id="pill-height">
+              {% for widget in form.height %}
+                {{ widget.tag }}
+                <label for="{{ widget.id_for_label }}"
+                       {% if widget.choice_value == 'custom' %}class="pill--wide"{% endif %}>
+                  {{ widget.choice_label }}
+                </label>
+              {% endfor %}
+            </div>
+            {% if form.height.errors %}<div class="field-error" style="margin-top:6px">{{ form.height.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Width -->
+          <div class="pf-field" style="margin-bottom:18px">
+            <label class="pf-label pf-label--req">Width <span style="font-weight:400;color:var(--text-muted);font-size:.72rem">(inches)</span></label>
+            <div class="pill-group" id="pill-width">
+              {% for widget in form.width %}
+                {{ widget.tag }}
+                <label for="{{ widget.id_for_label }}"
+                       {% if widget.choice_value == 'custom' %}class="pill--wide"{% endif %}>
+                  {{ widget.choice_label }}
+                </label>
+              {% endfor %}
+            </div>
+            {% if form.width.errors %}<div class="field-error" style="margin-top:6px">{{ form.width.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Thickness -->
+          <div class="pf-field">
+            <label class="pf-label pf-label--req">Thickness</label>
+            <div class="pill-group" id="pill-thickness">
+              {% for widget in form.thickness %}
+                {{ widget.tag }}
+                <label for="{{ widget.id_for_label }}">{{ widget.choice_label }}</label>
+              {% endfor %}
+            </div>
+            {% if form.thickness.errors %}<div class="field-error" style="margin-top:6px">{{ form.thickness.errors }}</div>{% endif %}
+          </div>
+        </div>
+
+        <!-- 4. Surface Finish -->
+        <div class="pf-section">
+          <div class="pf-section__head">
+            <div class="pf-section__num">4</div>
+            <div class="pf-section__title">Surface Finish</div>
+            <span class="pf-section__sub">Select all available</span>
+          </div>
+          <div class="pf-field">
+            <div class="pill-group" id="pill-finish">
+              {% for widget in form.finish_type %}
+                {{ widget.tag }}
+                <label for="{{ widget.id_for_label }}">{{ widget.choice_label }}</label>
+              {% endfor %}
+            </div>
+            {% if form.finish_type.errors %}<div class="field-error" style="margin-top:6px">{{ form.finish_type.errors }}</div>{% endif %}
+          </div>
+        </div>
+
+      </div><!-- /.pf-main -->
+
+
+      <!-- ══════════════════════════════════════
+           RIGHT — Aside panel
+           ══════════════════════════════════════ -->
+      <div class="pf-aside">
+
+        <!-- Photos -->
+        <div class="pf-aside-section">
+          <div class="pf-aside-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 style="display:inline;vertical-align:-2px;margin-right:5px">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            Product Photos
+            <span style="font-size:.62rem;font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0">
+              JPG/PNG, max 5 MB
+            </span>
+          </div>
+
+          <!-- Main photo zone -->
+          <div style="margin-bottom:14px">
+            <div style="font-size:.67rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:7px">
+              Main Photo {% if action != 'edit' %}<span style="color:var(--gold)">*</span>{% endif %}
+            </div>
+
+            <label class="pf-photo-main" for="id_image_main" id="zone-main"
+                   style="position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;min-height:130px;transition:border-color .2s;">
+              <img id="preview-main"
+                   src="{% if action == 'edit' and product.image_main %}{{ product.image_main.url }}{% endif %}"
+                   alt=""
+                   style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;
+                          display:{% if action == 'edit' and product.image_main %}block{% else %}none{% endif %};">
+              <div id="overlay-main"
+                   style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:6px;
+                          {% if action == 'edit' and product.image_main %}background:rgba(0,0,0,.45);padding:10px 18px;border-radius:8px;{% endif %}">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     style="{% if action == 'edit' and product.image_main %}stroke:#fff;{% endif %}">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <div class="pf-photo-main__label" id="main-photo-label"
+                     style="{% if action == 'edit' and product.image_main %}color:#fff;{% endif %}">
+                  {% if action == 'edit' and product.image_main %}Change photo{% else %}Click to upload{% endif %}
+                </div>
+                <div class="pf-photo-main__hint"
+                     style="{% if action == 'edit' and product.image_main %}color:rgba(255,255,255,.75);{% endif %}">
+                  Primary catalogue image
+                </div>
+              </div>
+              {{ form.image_main }}
+            </label>
+            {% if form.image_main.errors %}<div class="field-error">{{ form.image_main.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Extra photos -->
+          <div style="font-size:.67rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:7px">
+            Additional Photos
+          </div>
+          <div class="pf-photo-extras">
+
+            <label class="pf-photo-extra" for="id_image_2" id="zone-2"
+                   style="position:relative;cursor:pointer;overflow:hidden;">
+              <img id="preview-2"
+                   src="{% if action == 'edit' and product.image_2 %}{{ product.image_2.url }}{% endif %}"
+                   alt=""
+                   style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;
+                          display:{% if action == 'edit' and product.image_2 %}block{% else %}none{% endif %};">
+              <div id="overlay-2" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:4px;
+                   {% if action == 'edit' and product.image_2 %}background:rgba(0,0,0,.4);padding:6px 10px;border-radius:6px;{% endif %}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     style="{% if action == 'edit' and product.image_2 %}stroke:#fff;{% endif %}">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span id="label-2" style="{% if action == 'edit' and product.image_2 %}color:#fff;{% endif %}">
+                  {% if action == 'edit' and product.image_2 %}Change{% else %}Photo 2{% endif %}
+                </span>
+              </div>
+              {{ form.image_2 }}
+            </label>
+
+            <label class="pf-photo-extra" for="id_image_3" id="zone-3"
+                   style="position:relative;cursor:pointer;overflow:hidden;">
+              <img id="preview-3"
+                   src="{% if action == 'edit' and product.image_3 %}{{ product.image_3.url }}{% endif %}"
+                   alt=""
+                   style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;
+                          display:{% if action == 'edit' and product.image_3 %}block{% else %}none{% endif %};">
+              <div id="overlay-3" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:4px;
+                   {% if action == 'edit' and product.image_3 %}background:rgba(0,0,0,.4);padding:6px 10px;border-radius:6px;{% endif %}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     style="{% if action == 'edit' and product.image_3 %}stroke:#fff;{% endif %}">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span id="label-3" style="{% if action == 'edit' and product.image_3 %}color:#fff;{% endif %}">
+                  {% if action == 'edit' and product.image_3 %}Change{% else %}Photo 3{% endif %}
+                </span>
+              </div>
+              {{ form.image_3 }}
+            </label>
+
+            <label class="pf-photo-extra" for="id_image_4" id="zone-4"
+                   style="position:relative;cursor:pointer;overflow:hidden;">
+              <img id="preview-4"
+                   src="{% if action == 'edit' and product.image_4 %}{{ product.image_4.url }}{% endif %}"
+                   alt=""
+                   style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;
+                          display:{% if action == 'edit' and product.image_4 %}block{% else %}none{% endif %};">
+              <div id="overlay-4" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:4px;
+                   {% if action == 'edit' and product.image_4 %}background:rgba(0,0,0,.4);padding:6px 10px;border-radius:6px;{% endif %}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     style="{% if action == 'edit' and product.image_4 %}stroke:#fff;{% endif %}">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span id="label-4" style="{% if action == 'edit' and product.image_4 %}color:#fff;{% endif %}">
+                  {% if action == 'edit' and product.image_4 %}Change{% else %}Photo 4{% endif %}
+                </span>
+              </div>
+              {{ form.image_4 }}
+            </label>
+
+          </div>
+
+          {% if existing_images %}
+          <div style="margin-top:12px">
+            <div style="font-size:.67rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:7px">Current Photos</div>
+            <div class="pf-existing">
+              {% for img in existing_images %}
+              <div class="pf-existing__item">
+                <img src="{{ img.url }}" alt="Product photo" loading="lazy">
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Pricing -->
+        <div class="pf-aside-section">
+          <div class="pf-aside-title">Pricing</div>
+          <div class="pf-pricing-card">
+            <div class="pf-pricing-card__label">Rate per sq.ft</div>
+            {{ form.sft_rate }}
+            <div class="pf-pricing-note">For non-Pooja doors. Leave blank if not applicable.</div>
+            {% if form.sft_rate.errors %}<div class="field-error">{{ form.sft_rate.errors }}</div>{% endif %}
+          </div>
+          <div class="pf-pricing-card">
+            <div class="pf-pricing-card__label">Pooja Room Price (₹)</div>
+            {{ form.pooja_price }}
+            <div class="pf-pricing-note">Only for Pooja Room category. Leave blank for "Price on request".</div>
+            {% if form.pooja_price.errors %}<div class="field-error">{{ form.pooja_price.errors }}</div>{% endif %}
+          </div>
+        </div>
+
+        <!-- Key Features -->
+        <div class="pf-aside-section">
+          <div class="pf-aside-title">Key Features</div>
+          {{ form.features }}
+          <div class="pf-features-hint">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            One feature per line — e.g. Anti-termite treated
+          </div>
+          {% if form.features.errors %}<div class="field-error">{{ form.features.errors }}</div>{% endif %}
+        </div>
+
+        <!-- Visibility -->
+        <div class="pf-aside-section">
+          <div class="pf-aside-title">Visibility</div>
+          <label class="pf-toggle">
+            <div class="pf-toggle__info">
+              <div class="pf-toggle__name">Featured on Homepage</div>
+              <div class="pf-toggle__desc">Highlight this design in the featured collection</div>
+            </div>
+            {{ form.is_featured }}
+          </label>
+          {% if form.is_featured.errors %}<div class="field-error" style="margin-top:6px">{{ form.is_featured.errors }}</div>{% endif %}
+        </div>
+
+        <!-- Tip -->
+        <div class="pf-tip">
+          <div class="pf-tip__title">Good to know</div>
+          <div class="pf-tip__body">Products are visible on the website immediately after saving. You can edit or remove them at any time from the Products list.</div>
+        </div>
+
+      </div><!-- /.pf-aside -->
+    </div><!-- /.pf-layout -->
+
+    <!-- Actions -->
+    <div class="pf-actions">
+      <a href="{% url 'dashboard_products' %}" class="btn btn--secondary">Cancel</a>
+      <button type="submit" class="btn btn--primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        {% if action == 'edit' %}Save Changes{% else %}Create Product{% endif %}
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<!-- Live image preview -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  function setupPreview(inputId, previewId, overlayId, labelId, isMain) {
+    var input   = document.getElementById(inputId);
+    var preview = document.getElementById(previewId);
+    var overlay = document.getElementById(overlayId);
+    var label   = document.getElementById(labelId);
+    if (!input || !preview) return;
+
+    input.addEventListener('change', function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        if (overlay) {
+          overlay.style.background   = 'rgba(0,0,0,0.45)';
+          overlay.style.padding      = isMain ? '10px 18px' : '6px 10px';
+          overlay.style.borderRadius = '8px';
+          overlay.querySelectorAll('svg').forEach(function(s){ s.style.stroke = '#fff'; });
+          overlay.querySelectorAll('span, div').forEach(function(el){ el.style.color = '#fff'; });
+        }
+        if (label) { label.textContent = isMain ? 'Change photo' : 'Change'; label.style.color = '#fff'; }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  setupPreview('id_image_main', 'preview-main', 'overlay-main', 'main-photo-label', true);
+  setupPreview('id_image_2',    'preview-2',    'overlay-2',    'label-2',           false);
+  setupPreview('id_image_3',    'preview-3',    'overlay-3',    'label-3',           false);
+  setupPreview('id_image_4',    'preview-4',    'overlay-4',    'label-4',           false);
+});
+</script>
+
+{% endblock %}

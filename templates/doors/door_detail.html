@@ -1,0 +1,730 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ door.name }} — Shiv Shankar Door{% endblock %}
+{% block extra_css %}
+<style>
+/* Gallery main: relative so overlay + arrows can position inside */
+.door-gallery__main {
+  position: relative;
+  overflow: hidden;
+}
+.door-gallery__main-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.1s;
+}
+
+/* Prev / Next arrow buttons */
+.gallery-arrow {
+  position: absolute;
+  top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px;
+  background: rgba(255,255,255,0.90);
+  border: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 10;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  transition: background 0.18s, transform 0.18s, opacity 0.18s;
+  opacity: 0;
+  color: #1a1a1a;
+}
+.door-gallery__main:hover .gallery-arrow { opacity: 1; }
+.gallery-arrow--prev { left: 12px; }
+.gallery-arrow--next { right: 12px; }
+.gallery-arrow:hover {
+  background: #fff;
+  transform: translateY(-50%) scale(1.08);
+}
+
+/* Thumbnail active state */
+.door-gallery__thumb {
+  transition: opacity 0.18s, border-color 0.18s;
+}
+.door-gallery__thumb.active {
+  opacity: 1;
+}
+.door-gallery__thumb:not(.active) {
+  opacity: 0.58;
+}
+.door-gallery__thumb:hover {
+  opacity: 1;
+}
+
+/* Spec value pills for multi-value fields */
+.spec-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.spec-pill {
+  display: inline-block;
+  background: var(--beige, #f5f1eb);
+  border: 1px solid var(--border, #e0d9ce);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  color: var(--black, #1a1a1a);
+  white-space: nowrap;
+}
+.spec-pill--highlight {
+  background: #fdf6e3;
+  border-color: #c9a961;
+  color: #8a6d1f;
+  font-weight: 600;
+}
+/* Fixed active pill (thickness) */
+.spec-pill--active {
+  background: var(--gold, #c9a961);
+  border-color: var(--gold, #c9a961);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Size select section above action buttons */
+.door-size-select {
+  margin: 0 0 20px;
+  padding: 16px;
+  background: #faf7f2;
+  border: 1px solid #e8dcc8;
+  border-radius: 12px;
+}
+.door-size-select__row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.door-size-select__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold, #c9a961);
+  margin-bottom: 8px;
+}
+
+/* Selectable pills */
+.spec-pill--selectable {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.spec-pill--selectable:hover {
+  border-color: #c9a961;
+  color: #8a6d1f;
+}
+.spec-pill--selectable.selected {
+  background: #c9a961;
+  border-color: #c9a961;
+  color: #fff;
+  font-weight: 700;
+}
+/* Custom input inside pill */
+.spec-pill--custom-trigger {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.spec-pill--custom-trigger.selected {
+  background: #c9a961;
+  border-color: #c9a961;
+  color: #fff;
+}
+.spec-pill__custom-input {
+  width: 64px;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.6);
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+  outline: none;
+  padding: 1px 2px;
+  display: none;
+}
+.spec-pill--custom-trigger.selected .spec-pill__custom-input {
+  display: inline-block;
+}
+/* Price result */
+.pill-price-result {
+  margin-top: 16px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  border-radius: 12px;
+  padding: 18px 20px;
+  animation: fadeSlideIn 0.3s ease;
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pill-price-result__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #c9a961;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.pill-price-result__price {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.pill-price-result__note {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+  margin-top: 4px;
+}
+.pill-price-result__hint {
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.3);
+  margin-top: 8px;
+  font-style: italic;
+}
+
+/* ── Price Estimator ─────────────────────────────────── */
+.price-estimator {
+  margin: 16px 0 0;
+  background: #fdf9f3;
+  border: 1px solid #e8dcc8;
+  border-radius: 12px;
+  padding: 20px;
+}
+.price-estimator__title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold, #c9a961);
+  margin-bottom: 14px;
+}
+.price-estimator__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+.price-estimator__field label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-light, #666);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.price-estimator__input-wrap select,
+.price-estimator__input-wrap input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #fff;
+  color: var(--black, #1a1a1a);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.price-estimator__input-wrap select:focus,
+.price-estimator__input-wrap input:focus {
+  border-color: var(--gold, #c9a961);
+}
+.price-estimator__thickness {
+  padding: 9px 12px;
+  background: #f0ece4;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #888;
+  white-space: nowrap;
+}
+.price-estimator__result {
+  margin-top: 16px;
+  border-top: 1px solid #e8dcc8;
+  padding-top: 16px;
+}
+.price-estimator__result-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.price-estimator__result-label {
+  font-size: 0.78rem;
+  color: var(--text-light, #666);
+  font-weight: 500;
+}
+.price-estimator__result-price {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--black, #1a1a1a);
+  letter-spacing: -0.02em;
+}
+.price-estimator__result-note {
+  font-size: 0.75rem;
+  color: #999;
+}
+.price-estimator__result-hint {
+  font-size: 0.72rem;
+  color: #aaa;
+  margin-top: 8px;
+  font-style: italic;
+}
+@media (max-width: 520px) {
+  .price-estimator__row { grid-template-columns: 1fr 1fr; }
+  .price-estimator__field:last-child { grid-column: span 2; }
+}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="page-hero page-hero--short">
+    <div class="container">
+        <nav class="breadcrumb">
+            <a href="{% url 'home' %}">Home</a>
+            <span>→</span>
+            <a href="{% url 'gallery' %}">Collection</a>
+            <span>→</span>
+            <span>{{ door.name }}</span>
+        </nav>
+    </div>
+</div>
+
+<section class="door-detail-section">
+    <div class="container">
+        <div class="door-detail">
+            <!-- Image Gallery -->
+            <div class="door-detail__gallery">
+                <div class="door-gallery">
+                    <div class="door-gallery__main">
+                        <img src="{{ door.image_main.url }}" alt="{{ door.name }}" id="mainImage" class="door-gallery__main-img">
+                    </div>
+                    {% if images|length > 1 %}
+                    <div class="door-gallery__thumbs">
+                        {% for img in images %}
+                        <div class="door-gallery__thumb {% if forloop.first %}active{% endif %}" onclick="changeImage('{{ img.url }}', this)">
+                            <img src="{{ img.url }}" alt="{{ door.name }} view {{ forloop.counter }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Door Info -->
+            <div class="door-detail__info">
+                <span class="door-detail__category">{{ door.get_category_display }}</span>
+                <h1 class="door-detail__name">{{ door.name }}</h1>
+                <div class="door-detail__price">{{ door.get_price_display }}</div>
+
+                <p class="door-detail__desc">{{ door.description }}</p>
+
+                {% if not door.is_pooja and door.sft_rate and door.sft_rate != 'custom' %}
+                <!-- Size & Price Selection -->
+                <div class="door-size-select">
+
+                  <div class="door-size-select__row">
+                    <div class="door-size-select__group">
+                      <div class="door-size-select__label">Height</div>
+                      <div class="spec-pills" id="heightPillsTop">
+                        {% for label, is_custom in door.get_height_display_list %}
+                        {% if not is_custom %}
+                        <span class="spec-pill spec-pill--selectable"
+                              data-type="height"
+                              data-raw="{% with hlist=door.get_height_list %}{{ hlist|join:',' }}{% endwith %}"
+                              data-index="{{ forloop.counter0 }}">{{ label }}</span>
+                        {% else %}
+                        <span class="spec-pill spec-pill--highlight spec-pill--custom-trigger"
+                              data-type="height" data-raw="custom">
+                          Custom
+                          <input type="number" class="spec-pill__custom-input" id="heightCustomInput"
+                                 placeholder="e.g. 84" min="1" onclick="event.stopPropagation()">
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                    <div class="door-size-select__group">
+                      <div class="door-size-select__label">Width</div>
+                      <div class="spec-pills" id="widthPillsTop">
+                        {% for label, is_custom in door.get_width_display_list %}
+                        {% if not is_custom %}
+                        <span class="spec-pill spec-pill--selectable"
+                              data-type="width"
+                              data-raw="{% with wlist=door.get_width_list %}{{ wlist|join:',' }}{% endwith %}"
+                              data-index="{{ forloop.counter0 }}">{{ label }}</span>
+                        {% else %}
+                        <span class="spec-pill spec-pill--highlight spec-pill--custom-trigger"
+                              data-type="width" data-raw="custom">
+                          Custom
+                          <input type="number" class="spec-pill__custom-input" id="widthCustomInput"
+                                 placeholder="e.g. 36" min="1" onclick="event.stopPropagation()">
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Thickness fixed display -->
+                  <div class="door-size-select__group">
+                    <div class="door-size-select__label">Thickness</div>
+                    <div class="spec-pills">
+                      <span class="spec-pill spec-pill--active">32 mm</span>
+                    </div>
+                  </div>
+
+                  <!-- Price result -->
+                  <div class="pill-price-result" id="pillPriceResult" style="display:none">
+                    <div class="pill-price-result__label">Estimated Price</div>
+                    <div class="pill-price-result__price" id="pillPriceOutput">—</div>
+                    <div class="pill-price-result__note" id="pillSftNote"></div>
+                    <div class="pill-price-result__hint">Final price may vary. Contact us for an exact quote.</div>
+                  </div>
+
+                </div>
+                <script id="doorPriceData" type="application/json">
+                {"sftRate": {{ door.sft_rate }},
+                 "heights": [{% for h in door.get_height_list %}"{{ h }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+                 "widths":  [{% for w in door.get_width_list %}"{{ w }}"{% if not forloop.last %},{% endif %}{% endfor %}]}
+                </script>
+                {% endif %}
+
+                <!-- Action Buttons -->
+                <div class="door-detail__actions">
+                    <a href="{{ whatsapp_url }}" target="_blank" class="btn btn--whatsapp btn--lg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        Enquire on WhatsApp
+                    </a>
+                    <button class="btn btn--outline-dark btn--lg" onclick="document.getElementById('inquiryForm').scrollIntoView({behavior:'smooth'})">
+                        Send Inquiry
+                    </button>
+                </div>
+
+                <!-- Specs Table -->
+                <div class="door-detail__specs">
+                    <h3 class="door-detail__specs-title">Specifications</h3>
+                    <table class="specs-table">
+                        <tr>
+                          <td>Category</td>
+                          <td>
+                            <div class="spec-pills">
+                              {% for label in door.get_category_display_list %}
+                              <span class="spec-pill">{{ label }}</span>
+                              {% endfor %}
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Material</td>
+                          <td>
+                            <div class="spec-pills">
+                              <span class="spec-pill">{{ door.get_material_display }}</span>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Finish</td>
+                          <td>
+                            <div class="spec-pills">
+                              {% for label in door.get_finish_display_list %}
+                              <span class="spec-pill">{{ label }}</span>
+                              {% endfor %}
+                            </div>
+                          </td>
+                        </tr>
+
+                    </table>
+                </div>
+
+                <!-- Features -->
+                {% if door.get_features_list %}
+                <div class="door-detail__features">
+                    <h3 class="door-detail__specs-title">Features</h3>
+                    <ul class="features-list">
+                        {% for feature in door.get_features_list %}
+                        <li>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            {{ feature }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <!-- AI Preview CTA -->
+                <div class="door-detail__ai-cta">
+                    <a href="{% url 'ai_preview' %}?door={{ door.pk }}" class="ai-preview-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Preview on Your Home
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inquiry Form -->
+        <div class="inquiry-section" id="inquiryForm">
+            <div class="inquiry-section__inner">
+                <div class="inquiry-section__header">
+                    <h2>Send an Inquiry</h2>
+                    <p>Interested in <strong>{{ door.name }}</strong>? Fill the form below and we'll get back to you within 24 hours.</p>
+                </div>
+                {% if messages %}
+                {% for message in messages %}
+                <div class="message message--{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+                {% endif %}
+                <form method="post" class="inquiry-form">
+                    {% csrf_token %}
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Full Name *</label>
+                            {{ form.name }}
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number *</label>
+                            {{ form.phone }}
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            {{ form.email }}
+                        </div>
+                        <div class="form-group">
+                            <label>Location</label>
+                            {{ form.location }}
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Message *</label>
+                        {{ form.message }}
+                    </div>
+                    <button type="submit" class="btn btn--gold">Submit Inquiry</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Related Doors -->
+        {% if related_doors %}
+        <div class="related-doors">
+            <div class="section__header">
+                <span class="section__eyebrow">More like this</span>
+                <h2 class="section__title">Related Designs</h2>
+            </div>
+            <div class="doors-grid">
+                {% for rdoor in related_doors %}
+                <article class="door-card">
+                    <a href="{{ rdoor.get_absolute_url }}" class="door-card__link">
+                        <div class="door-card__image-wrap">
+                            <img src="{{ rdoor.image_main.url }}" alt="{{ rdoor.name }}" class="door-card__image" loading="lazy">
+                            <div class="door-card__overlay"><span class="door-card__view">View Details</span></div>
+                        </div>
+                        <div class="door-card__info">
+                            <span class="door-card__category">{{ rdoor.get_category_display }}</span>
+                            <h3 class="door-card__name">{{ rdoor.name }}</h3>
+                            <span class="door-card__price">{{ rdoor.get_price_display }}</span>
+                        </div>
+                    </a>
+                </article>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const mainWrap = document.querySelector('.door-gallery__main');
+  const mainImg  = document.getElementById('mainImage');
+  const thumbs   = document.querySelectorAll('.door-gallery__thumb');
+
+  if (!mainImg || thumbs.length === 0) return;
+
+  /* ── Crossfade helper ─────────────────────────────────── */
+  function fadeToImage(url, activeThumb) {
+    if (mainImg.src.endsWith(url) || mainImg.dataset.transitioning) return;
+
+    mainImg.dataset.transitioning = '1';
+
+    // Create overlay image that fades in on top
+    const next = document.createElement('img');
+    next.src   = url;
+    next.className = 'door-gallery__main-img door-gallery__main-img--next';
+    next.style.cssText = `
+      position:absolute; inset:0; width:100%; height:100%;
+      object-fit:cover; opacity:0;
+      transition:opacity 0.45s cubic-bezier(0.4,0,0.2,1);
+    `;
+    mainWrap.style.position = 'relative';
+    mainWrap.appendChild(next);
+
+    // Wait one frame then fade in
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        next.style.opacity = '1';
+      });
+    });
+
+    next.addEventListener('transitionend', () => {
+      mainImg.src = url;
+      mainImg.style.opacity = '1';
+      next.remove();
+      delete mainImg.dataset.transitioning;
+    }, { once: true });
+
+    // Update thumbs
+    thumbs.forEach(t => t.classList.remove('active'));
+    if (activeThumb) activeThumb.classList.add('active');
+  }
+
+  /* ── Attach click handlers ───────────────────────────── */
+  thumbs.forEach(thumb => {
+    const img = thumb.querySelector('img');
+    if (!img) return;
+    thumb.style.cursor = 'pointer';
+    thumb.onclick = () => fadeToImage(img.src, thumb);
+  });
+
+  /* ── Arrow navigation ───────────────────────────────── */
+  const allUrls  = Array.from(thumbs).map(t => t.querySelector('img')?.src).filter(Boolean);
+  let currentIdx = 0;
+
+  function navigate(dir) {
+    currentIdx = (currentIdx + dir + allUrls.length) % allUrls.length;
+    fadeToImage(allUrls[currentIdx], thumbs[currentIdx]);
+  }
+
+  // Add prev/next arrow buttons to main image
+  if (allUrls.length > 1) {
+    ['prev','next'].forEach((type, i) => {
+      const btn = document.createElement('button');
+      btn.className = `gallery-arrow gallery-arrow--${type}`;
+      btn.innerHTML = i === 0
+        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>`
+        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>`;
+      btn.onclick = () => navigate(i === 0 ? -1 : 1);
+      mainWrap.appendChild(btn);
+    });
+  }
+
+  /* ── Keyboard support ────────────────────────────────── */
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft')  navigate(-1);
+    if (e.key === 'ArrowRight') navigate(1);
+  });
+
+  /* ── Touch / swipe support ──────────────────────────── */
+  let touchStartX = 0;
+  mainWrap.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+  mainWrap.addEventListener('touchend',   e => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 40) navigate(diff > 0 ? 1 : -1);
+  });
+})();
+
+/* ── Pill Price Calculator JS ────────────────────────── */
+(function () {
+  var dataEl = document.getElementById('doorPriceData');
+  if (!dataEl) return;
+
+  var data    = JSON.parse(dataEl.textContent);
+  var sftRate = parseFloat(data.sftRate);
+  var heights = data.heights;
+  var widths  = data.widths;
+
+  var priceResult = document.getElementById('pillPriceResult');
+  var priceOutput = document.getElementById('pillPriceOutput');
+  var sftNote     = document.getElementById('pillSftNote');
+
+  var selectedH = null;   // inches
+  var selectedW = null;   // inches
+
+  // Convert stored value (mm or inch number) to inches
+  function toInches(val) {
+    if (!val || val === 'custom') return null;
+    var n = parseFloat(val);
+    if (isNaN(n)) return null;
+    return n > 100 ? n / 25.4 : n;   // >100 = mm, else already inches
+  }
+
+  function calculate() {
+    if (!selectedH || !selectedW) { priceResult.style.display = 'none'; return; }
+    var rawSft  = (selectedH * selectedW) / 144;
+    var billSft = rawSft < 16 ? 16 : rawSft;
+    var price   = billSft * sftRate;
+    priceOutput.textContent = '₹' + Math.round(price).toLocaleString('en-IN');
+    sftNote.textContent     = billSft.toFixed(2) + ' sq.ft × ₹' + sftRate + '/sq.ft'
+                              + (rawSft < 16 ? '  (min. 16 sq.ft applied)' : '');
+    priceResult.style.display = 'block';
+  }
+
+  // Handle pill clicks
+  document.querySelectorAll('.spec-pill--selectable').forEach(function(pill) {
+    pill.addEventListener('click', function() {
+      var type  = this.dataset.type;
+      var raws  = this.dataset.raw.split(',');
+      var idx   = parseInt(this.dataset.index);
+      var val   = raws[idx];
+      var inches = toInches(val);
+
+      // Deselect ALL pills of this type
+      document.querySelectorAll('[data-type="' + type + '"]')
+        .forEach(function(p) { p.classList.remove('selected'); });
+
+      // Hide and clear any custom input for this type
+      var customInp = document.querySelector('.spec-pill--custom-trigger[data-type="' + type + '"] .spec-pill__custom-input');
+      if (customInp) { customInp.style.display = 'none'; customInp.value = ''; }
+
+      this.classList.add('selected');
+
+      if (type === 'height') selectedH = inches;
+      else                   selectedW = inches;
+      calculate();
+    });
+  });
+
+  // Handle custom pill click + input
+  document.querySelectorAll('.spec-pill--custom-trigger').forEach(function(pill) {
+    pill.addEventListener('click', function(e) {
+      // Don't re-trigger if clicking inside the input
+      if (e.target.tagName === 'INPUT') return;
+      var type = this.dataset.type;
+
+      // Deselect ALL pills of this type (both regular and custom)
+      document.querySelectorAll('[data-type="' + type + '"]')
+        .forEach(function(p) { p.classList.remove('selected'); });
+
+      // Select this custom pill
+      this.classList.add('selected');
+
+      // Show and focus the input
+      var inp = this.querySelector('.spec-pill__custom-input');
+      if (inp) {
+        inp.style.display = 'inline-block';
+        setTimeout(function(){ inp.focus(); }, 50);
+      }
+
+      // Reset the value until user types
+      if (type === 'height') selectedH = null;
+      else                   selectedW = null;
+      calculate();
+    });
+
+    var inp = pill.querySelector('.spec-pill__custom-input');
+    if (!inp) return;
+    inp.addEventListener('input', function() {
+      var type = pill.dataset.type;
+      var val  = parseFloat(this.value);
+      if (type === 'height') selectedH = isNaN(val) ? null : val;
+      else                   selectedW = isNaN(val) ? null : val;
+      calculate();
+    });
+    // Stop click on input bubbling to pill
+    inp.addEventListener('click', function(e) { e.stopPropagation(); });
+  });
+})();
+</script>
+{% endblock %}
