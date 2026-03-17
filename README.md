@@ -1,6 +1,6 @@
 # Shiv Shankar Door — Luxury Door Portfolio Website
 
-A premium Django-based digital showroom for luxury door designs.
+A full-stack web application built with Django for a luxury door showroom business. Includes a customer-facing storefront, AI-powered door preview using OpenCV, interactive price estimator, and an owner dashboard for complete product management.
 
 ## Quick Start
 
