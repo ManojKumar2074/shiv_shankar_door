@@ -1,4 +1,4 @@
-from doors.models import Inquiry
+from doors.models import Inquiry 
 
 
 def dashboard_context(request):
