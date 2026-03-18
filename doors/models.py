@@ -1,8 +1,9 @@
-from django.db import models
-from django.urls import reverse
+from django.db import models #importing models from django.db
+from django.urls import reverse #importing reverse from django.urls
 
 
-class Door(models.Model):
+class Door(models.Model): 
+    # Category choices for the door
     CATEGORY_CHOICES = [
         ('main_entrance', 'Main Entrance'),
         ('bedroom', 'Bedroom'),
@@ -12,6 +13,7 @@ class Door(models.Model):
         ('pooja', 'Pooja Room Door'),
     ]
 
+    # Material choices for the door
     MATERIAL_CHOICES = [
         ('hard_wood', 'Hard Wood'),
         ('engineered_wood', 'Engineered Wood'),
@@ -22,6 +24,7 @@ class Door(models.Model):
         ('aluminium', 'Aluminium'),
     ]
 
+    # Height choices for the door
     HEIGHT_CHOICES = [
         ('72',  '72"'),
         ('75',  '75"'),
@@ -31,6 +34,7 @@ class Door(models.Model):
         ('custom', 'Custom'),
     ]
 
+    # Width choices for the door
     WIDTH_CHOICES = [
         ('26',  '26"'),
         ('28',  '28"'),
@@ -41,6 +45,7 @@ class Door(models.Model):
         ('custom', 'Custom'),
     ]
 
+    # Thickness choices for the door
     THICKNESS_CHOICES = [
         ('30', '30 mm'),
         ('32', '32 mm'),
@@ -51,6 +56,7 @@ class Door(models.Model):
         ('45', '45 mm'),
     ]
 
+    # SFT rate choices for the door
     SFT_RATE_CHOICES = [
         ('270', '₹270 per sq.ft'),
         ('300', '₹300 per sq.ft'),
@@ -58,6 +64,7 @@ class Door(models.Model):
         ('custom', 'Custom / On Request'),
     ]
 
+    # Finish choices for the door
     FINISH_CHOICES = [
         ('matte', 'Matte'),
         ('gloss', 'Gloss'),
@@ -67,9 +74,13 @@ class Door(models.Model):
         ('lacquered', 'Lacquered'),
     ]
 
+    # Name of the door
     name        = models.CharField(max_length=200)
+    # Category of the door
     category    = models.CharField(max_length=200, help_text='One or more categories, comma-separated')
+    # Material of the door
     material    = models.CharField(max_length=50, choices=MATERIAL_CHOICES)
+    # Description of the door
     description = models.TextField()
 
     height    = models.CharField(max_length=200, help_text='One or more heights, comma-separated')
@@ -97,22 +108,28 @@ class Door(models.Model):
         help_text="Rate per sq.ft — for all doors except Pooja Room"
     )
 
+    # Main image of the door
     image_main  = models.ImageField(upload_to='doors/')
+    # Second image of the door
     image_2     = models.ImageField(upload_to='doors/', blank=True, null=True)
+    # Third image of the door
     image_3     = models.ImageField(upload_to='doors/', blank=True, null=True)
+    # Fourth image of the door
     image_4     = models.ImageField(upload_to='doors/', blank=True, null=True)
     features    = models.TextField(help_text="One feature per line", blank=True)
     is_featured = models.BooleanField(default=False)
+    # Created at date and time
     created_at  = models.DateTimeField(auto_now_add=True)
+    # Updated at date and time
     updated_at  = models.DateTimeField(auto_now=True)
 
-    class Meta:
+    class Meta: # Meta class for the door
         ordering = ['-created_at']
 
-    def __str__(self):
+    def __str__(self): # String representation of the door
         return self.name
 
-    def get_absolute_url(self):
+    def get_absolute_url(self): # Absolute URL of the door
         return reverse('door_detail', args=[self.pk])
 
     def get_features_list(self):
@@ -122,22 +139,22 @@ class Door(models.Model):
         # Support both single 'pooja' and comma-separated containing 'pooja'
         return 'pooja' in [c.strip() for c in self.category.split(',')]
 
-    def get_category_list(self):
+    def get_category_list(self): # List of categories
         return [c.strip() for c in self.category.split(',') if c.strip()]
 
-    def get_category_display(self):
+    def get_category_display(self): # Display category
         cat_map = dict(self.CATEGORY_CHOICES)
         labels = [cat_map.get(c, c.title()) for c in self.get_category_list()]
         return ', '.join(labels) if labels else '\u2014'
 
-    def get_category_display_list(self):
+    def get_category_display_list(self): # List of categories
         cat_map = dict(self.CATEGORY_CHOICES)
         return [cat_map.get(c, c.title()) for c in self.get_category_list()]
 
-    def get_height_list(self):
+    def get_height_list(self): # List of heights
         return [h.strip() for h in self.height.split(',') if h.strip()]
 
-    def get_height_display(self):
+    def get_height_display(self): # Display height
         h_map = dict(self.HEIGHT_CHOICES)
         labels = [h_map.get(h, h + '"') for h in self.get_height_list()]
         return ', '.join(labels) if labels else '\u2014'
@@ -147,32 +164,32 @@ class Door(models.Model):
         h_map = dict(self.HEIGHT_CHOICES)
         return [(h_map.get(h, h + '"'), h == 'custom') for h in self.get_height_list()]
 
-    def get_width_list(self):
+    def get_width_list(self): # List of widths
         return [w.strip() for w in self.width.split(',') if w.strip()]
 
-    def get_width_display(self):
+    def get_width_display(self): # Display width
         w_map = dict(self.WIDTH_CHOICES)
         labels = [w_map.get(w, w + '"') for w in self.get_width_list()]
         return ', '.join(labels) if labels else '\u2014'
 
-    def get_width_display_list(self):
+    def get_width_display_list(self):  
         # Returns list of (label, is_custom) tuples
         w_map = dict(self.WIDTH_CHOICES)
         return [(w_map.get(w, w + '"'), w == 'custom') for w in self.get_width_list()]
 
-    def get_thickness_list(self):
+    def get_thickness_list(self): # List of thicknesses
         return [t.strip() for t in self.thickness.split(',') if t.strip()]
 
-    def get_thickness_display(self):
+    def get_thickness_display(self): # Display thickness
         t_map = dict(self.THICKNESS_CHOICES)
         labels = [t_map.get(t, t + ' mm') for t in self.get_thickness_list()]
         return ', '.join(labels) if labels else '\u2014'
 
-    def get_thickness_display_list(self):
+    def get_thickness_display_list(self): # List of thicknesses
         t_map = dict(self.THICKNESS_CHOICES)
         return [t_map.get(t, t + ' mm') for t in self.get_thickness_list()]
 
-    def get_price_display(self):
+    def get_price_display(self): # Display price
         """
         Pooja doors  → single fixed ₹ price
         Other doors  → rate per sq.ft (optional)
@@ -186,23 +203,23 @@ class Door(models.Model):
             return f"₹{self.sft_rate} / sq.ft"
         return "Price on request"
 
-    def get_finish_list(self):
+    def get_finish_list(self): # List of finishes
         return [f.strip() for f in self.finish_type.split(',') if f.strip()]
 
-    def get_finish_display(self):
+    def get_finish_display(self): # Display finish
         finish_map = dict(self.FINISH_CHOICES)
         labels = [finish_map.get(f, f.title()) for f in self.get_finish_list()]
         return ' & '.join(labels) if labels else '—'
 
-    def get_finish_display_list(self):
+    def get_finish_display_list(self): # List of finishes
         finish_map = dict(self.FINISH_CHOICES)
         return [finish_map.get(f, f.title()) for f in self.get_finish_list()]
 
     # Alias used in door_detail.html specs table
-    def get_finish_type_display(self):
+    def get_finish_type_display(self): # Display finish type
         return self.get_finish_display()
 
-    def get_all_images(self):
+    def get_all_images(self): # List of images
         images = [self.image_main]
         for img in [self.image_2, self.image_3, self.image_4]:
             if img:
@@ -211,22 +228,31 @@ class Door(models.Model):
 
 
 class Inquiry(models.Model):
+    # Status choices for the inquiry
     STATUS_CHOICES = [
         ('new',       'New'),
         ('contacted', 'Contacted'),
         ('quoted',    'Quoted'),
         ('closed',    'Closed'),
     ]
+    # Door of the inquiry
     door     = models.ForeignKey(Door, on_delete=models.SET_NULL, null=True, blank=True, related_name='inquiries')
+    # Name of the inquiry
     name     = models.CharField(max_length=100)
+    # Phone number of the inquiry
     phone    = models.CharField(max_length=15)
+    # Email of the inquiry
     email    = models.EmailField(blank=True)
+    # Location of the inquiry
     location = models.CharField(max_length=200, blank=True)
+    # Message of the inquiry
     message  = models.TextField()
+    # Status of the inquiry
     status   = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    # Created at date and time
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
+    class Meta: # Meta class for the inquiry
         ordering = ['-created_at']
         verbose_name_plural = 'Inquiries'
 
@@ -236,10 +262,14 @@ class Inquiry(models.Model):
 
 
 class DoorPreview(models.Model):
+    # Door of the preview
     door          = models.ForeignKey(Door, on_delete=models.CASCADE, related_name='previews')
+    # House image of the preview
     house_image   = models.ImageField(upload_to='previews/house/')
+    # Preview image of the preview
     preview_image = models.ImageField(upload_to='previews/result/', blank=True, null=True)
+    # Created at date and time
     created_at    = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
+    def __str__(self): # String representation of the preview
         return f"Preview: {self.door.name} — {self.created_at.strftime('%d %b %Y')}"
