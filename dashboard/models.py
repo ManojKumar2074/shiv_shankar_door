@@ -1,8 +1,8 @@
-from django.db import models
-from django.urls import reverse
+from django.db import models #import models from django.db
+from django.urls import reverse #import reverse to get absolute url of the model instance
 
-
-def door_image_path(slot):
+# Create database models for the application
+def door_image_path(slot): 
     """
     Returns a callable upload_to that saves images directly to
     media/doors/door_<pk>/<slot>.ext — no post-save moving needed.
