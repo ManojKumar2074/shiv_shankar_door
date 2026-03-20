@@ -18,12 +18,16 @@
 .ai-feature__after {
   position: relative;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
 }
 .ai-feature__img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   display: block;
   transition: transform 6s ease;
 }
@@ -47,7 +51,8 @@
 /* Before / After labels */
 .ai-feature__panel-label {
   position: absolute;
-  bottom: 14px; left: 14px;
+  bottom: 14px;
+  left: 14px;
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -56,7 +61,7 @@
   background: rgba(0,0,0,0.5);
   padding: 4px 10px;
   border-radius: 4px;
-  z-index: 4;
+  z-index: 5;
 }
 .ai-feature__after .ai-feature__panel-label {
   background: var(--gold, #c9a961);
@@ -182,42 +187,17 @@
             <div class="ai-feature__visual">
                 <div class="ai-feature__mockup">
 
-                    {% if featured_doors %}
-                    {% with door=featured_doors.0 %}
-
-                    <!-- BEFORE panel — plain house photo feel, door image desaturated -->
+                    <!-- BEFORE panel — house without door -->
                     <div class="ai-feature__before">
-                        <img src="{{ door.image_main.url }}" alt="Before" class="ai-feature__img ai-feature__img--before">
+                        <img src="{% static 'image/before_house.jpg' %}" alt="Before — House entrance" class="ai-feature__img ai-feature__img--before">
                         <span class="ai-feature__panel-label">Before</span>
                     </div>
 
-                    <!-- AFTER panel — door image full color, gold tint -->
-                    {% if featured_doors|length > 1 %}
-                    {% with door2=featured_doors.1 %}
+                    <!-- AFTER panel — house with door installed -->
                     <div class="ai-feature__after">
-                        <img src="{{ door2.image_main.url }}" alt="After" class="ai-feature__img">
+                        <img src="{% static 'image/after_house.jpg' %}" alt="After — With new door" class="ai-feature__img">
                         <span class="ai-feature__panel-label">After</span>
                     </div>
-                    {% endwith %}
-                    {% else %}
-                    <div class="ai-feature__after">
-                        <img src="{{ door.image_main.url }}" alt="After" class="ai-feature__img">
-                        <span class="ai-feature__panel-label">After</span>
-                    </div>
-                    {% endif %}
-
-                    {% endwith %}
-                    {% else %}
-
-                    <!-- Fallback if no featured doors -->
-                    <div class="ai-feature__before">
-                        <span class="ai-feature__panel-label">Before</span>
-                    </div>
-                    <div class="ai-feature__after">
-                        <span class="ai-feature__panel-label">After</span>
-                    </div>
-
-                    {% endif %}
 
                     <!-- Gold divider line -->
                     <div class="ai-feature__divider"></div>
