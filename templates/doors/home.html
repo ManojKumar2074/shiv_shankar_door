@@ -4,26 +4,24 @@
 
 {% block extra_css %}
 <style>
-/* ── AI Feature mockup with real images ──────────────────── */
+/* ── AI Feature mockup ──────────────────────────────────── */
 .ai-feature__mockup {
   position: relative;
   border-radius: 16px;
   overflow: hidden;
   width: 100%;
-  aspect-ratio: 4/3;
+  aspect-ratio: 16/9;
   box-shadow: 0 30px 80px rgba(0,0,0,0.45);
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 .ai-feature__before,
 .ai-feature__after {
   position: relative;
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
+  min-height: 0;
 }
 .ai-feature__img {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -67,6 +65,7 @@
   background: var(--gold, #c9a961);
   left: auto;
   right: 14px;
+  bottom: 14px;
 }
 /* Floating AI badge */
 .ai-feature__badge {
@@ -185,18 +184,20 @@
                 <a href="{% url 'ai_preview' %}" class="btn btn--gold">Try AI Preview Free</a>
             </div>
             <div class="ai-feature__visual">
-                <div class="ai-feature__mockup">
+                <div class="ai-feature__mockup" style="display:flex;flex-direction:row;align-items:stretch;">
 
-                    <!-- BEFORE panel — house without door -->
-                    <div class="ai-feature__before">
-                        <img src="{% static 'image/before_house.jpg' %}" alt="Before — House entrance" class="ai-feature__img ai-feature__img--before">
-                        <span class="ai-feature__panel-label">Before</span>
+                    <!-- BEFORE panel -->
+                    <div style="position:relative;overflow:hidden;width:50%;height:100%;flex-shrink:0;">
+                        <img src="{% static 'image/before_house.jpg' %}" alt="Before"
+                             style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;filter:grayscale(60%) brightness(0.75);">
+                        <span style="position:absolute;bottom:14px;left:14px;font-size:0.68rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:4px;z-index:5;">Before</span>
                     </div>
 
-                    <!-- AFTER panel — house with door installed -->
-                    <div class="ai-feature__after">
-                        <img src="{% static 'image/after_house.jpg' %}" alt="After — With new door" class="ai-feature__img">
-                        <span class="ai-feature__panel-label">After</span>
+                    <!-- AFTER panel -->
+                    <div style="position:relative;overflow:hidden;width:50%;height:100%;flex-shrink:0;">
+                        <img src="{% static 'image/after_house.jpg' %}" alt="After"
+                             style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;">
+                        <span style="position:absolute;bottom:14px;right:14px;font-size:0.68rem;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#fff;background:#c9a961;padding:4px 10px;border-radius:4px;z-index:5;">After</span>
                     </div>
 
                     <!-- Gold divider line -->
