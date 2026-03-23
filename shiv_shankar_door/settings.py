@@ -15,6 +15,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cloudinary',
+    'cloudinary_storage',
     'doors',
     'dashboard',
 ]
@@ -81,8 +83,22 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# ── Cloudinary Media Storage ─────────────────────────────
+import cloudinary
+cloudinary.config(
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME', 'drtqla7at'),
+    api_key    = os.environ.get('CLOUDINARY_API_KEY',    '941982985477659'),
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET', 'tq06KTje5-GES8LuzLRTwWRtZ3A'),
+    secure     = True,
+)
+
+# Use Cloudinary for media files on production, local media folder in dev
+if os.environ.get('USE_CLOUDINARY', 'False') == 'True':
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    MEDIA_URL = f'https://res.cloudinary.com/drtqla7at/'
+else:
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
