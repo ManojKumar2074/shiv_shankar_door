@@ -84,18 +84,16 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # ── Cloudinary Media Storage ─────────────────────────────
-import cloudinary
-cloudinary.config(
-    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME', 'drtqla7at'),
-    api_key    = os.environ.get('CLOUDINARY_API_KEY',    '941982985477659'),
-    api_secret = os.environ.get('CLOUDINARY_API_SECRET', 'tq06KTje5-GES8LuzLRTwWRtZ3A'),
-    secure     = True,
-)
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME', 'drtqla7at'),
+    'API_KEY':    os.environ.get('CLOUDINARY_API_KEY',    '941982985477659'),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET', 'tq06KTje5-GES8LuzLRTwWRtZ3A'),
+}
 
 # Use Cloudinary for media files on production, local media folder in dev
 if os.environ.get('USE_CLOUDINARY', 'False') == 'True':
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    MEDIA_URL = f'https://res.cloudinary.com/drtqla7at/'
+    MEDIA_URL = '/media/'
 else:
     MEDIA_URL = '/media/'
     MEDIA_ROOT = BASE_DIR / 'media'
