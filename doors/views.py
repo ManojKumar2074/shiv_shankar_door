@@ -107,6 +107,14 @@ def gallery(request):
     page       = request.GET.get('page', 1)
     doors_page = paginator.get_page(page)
 
+    # Build a reusable querystring containing every active GET filter EXCEPT
+    # 'page'. This is filter-agnostic by design — it doesn't hardcode
+    # 'category', 'material', etc., so any filter present today (or added
+    # later) is automatically preserved across pagination links.
+    querydict = request.GET.copy()
+    querydict.pop('page', None)
+    querystring = querydict.urlencode()
+
     context = {
         'doors':            doors_page,
         'total_results':    doors.count(),
@@ -119,6 +127,7 @@ def gallery(request):
         'current_search':   search,
         'current_price_max': price_max,
         'price_range':      price_range,
+        'querystring':      querystring,
     }
     return render(request, 'doors/gallery.html', context)
 

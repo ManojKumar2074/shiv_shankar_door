@@ -84,13 +84,13 @@
         {% if doors.has_other_pages %}
         <div class="pagination">
             {% if doors.has_previous %}
-            <a href="?page={{ doors.previous_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_material %}&material={{ current_material }}{% endif %}" class="pagination__btn">←</a>
+            <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ doors.previous_page_number }}" class="pagination__btn">←</a>
             {% endif %}
             {% for num in doors.paginator.page_range %}
-            <a href="?page={{ num }}" class="pagination__btn {% if doors.number == num %}active{% endif %}">{{ num }}</a>
+            <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ num }}" class="pagination__btn {% if doors.number == num %}active{% endif %}">{{ num }}</a>
             {% endfor %}
             {% if doors.has_next %}
-            <a href="?page={{ doors.next_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}" class="pagination__btn">→</a>
+            <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ doors.next_page_number }}" class="pagination__btn">→</a>
             {% endif %}
         </div>
         {% endif %}
