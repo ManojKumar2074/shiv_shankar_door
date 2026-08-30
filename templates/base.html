@@ -12,8 +12,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
     <link rel="icon" href="{% static 'image/favicon.png' %}">
-    <link rel="icon" type="image/favicon.png" sizes="32x32" href="{% static 'image/favicon.png' %}">
-    <link rel="icon" type="image/favicon.png" sizes="16x16" href="{% static 'images/favicon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'image/favicon-32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'image/favicon-16.png' %}">
     {% block extra_css %}{% endblock %}
 </head>
 <body class="{% if request.resolver_match.url_name == 'contact' %}page--contact{% else %}page--other{% endif %}">
