@@ -18,7 +18,12 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# Render sets RENDER_EXTERNAL_HOSTNAME automatically on web services.
+RENDER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 
+if RENDER_HOST and RENDER_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_HOST)
+    
 # ── Applications ─────────────────────────────────────────
 INSTALLED_APPS = [
     'django.contrib.admin',
