@@ -32,22 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000);
   });
 
-  // ── Confirm delete modal exposed functions ────────────────
-  window.confirmDelete = function (id, name) {
-    const modal = document.getElementById('deleteModal');
-    const nameEl = document.getElementById('deleteProductName');
-    const form = document.getElementById('deleteForm');
-    if (!modal || !nameEl || !form) return;
-    nameEl.textContent = '"' + name + '"';
-    form.action = '/dashboard/products/delete/' + id + '/';
-    modal.classList.add('open');
-  };
-
-  window.closeDeleteModal = function () {
-    const modal = document.getElementById('deleteModal');
-    if (modal) modal.classList.remove('open');
-  };
-
   // Close modal on Escape key
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
