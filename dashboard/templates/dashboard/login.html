@@ -260,6 +260,7 @@
 
       <form method="post" novalidate>
         {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.GET.next }}">
         <div class="login-field">
           <label for="id_username">Username</label>
           <input

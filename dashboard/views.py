@@ -12,6 +12,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.conf import settings
 from django.utils import timezone
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from doors.models import Door, Inquiry
 from .forms import DoorProductForm
@@ -24,6 +26,17 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────
 #  AUTH
 # ─────────────────────────────────────────────
+
+def _safe_next_url(request):
+    """Return ?next= only if it points back to THIS site; otherwise the dashboard home."""
+    candidate = request.POST.get('next') or request.GET.get('next') or ''
+    if candidate and url_has_allowed_host_and_scheme(
+        candidate,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return candidate
+    return reverse('dashboard_home')
 
 def dashboard_login(request):
     if request.user.is_authenticated:
@@ -49,13 +62,11 @@ def dashboard_login(request):
                 logger.exception(
                     'Could not write dashboard login audit row'
                 )
-
-            next_url = request.GET.get('next', 'dashboard_home')
             messages.success(
                 request,
                 f'Welcome back, {user.first_name or user.username}!'
             )
-            return redirect(next_url)
+            return redirect(_safe_next_url(request))
 
         else:
             messages.error(
@@ -65,7 +76,7 @@ def dashboard_login(request):
 
     return render(request, 'dashboard/login.html')
 
-
+@require_POST
 def dashboard_logout(request):
     logout(request)
     messages.info(request, 'You have been signed out.')
