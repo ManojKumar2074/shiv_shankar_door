@@ -4,7 +4,6 @@ import shutil
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.core.paginator import Paginator
@@ -16,6 +15,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from doors.models import Door, Inquiry
+from .decorators import staff_required
 from .forms import DoorProductForm
 from .models import DashboardSession
 
@@ -39,7 +39,7 @@ def _safe_next_url(request):
     return reverse('dashboard_home')
 
 def dashboard_login(request):
-    if request.user.is_authenticated:
+    if request.user.is_authenticated and request.user.is_staff:
         return redirect('dashboard_home')
 
     if request.method == 'POST':
@@ -96,7 +96,7 @@ def _get_client_ip(request):
 #  DASHBOARD HOME
 # ─────────────────────────────────────────────
 
-@login_required(login_url='dashboard_login')
+@staff_required
 def dashboard_home(request):
     total_products = Door.objects.count()
     featured_count = Door.objects.filter(is_featured=True).count()
@@ -137,7 +137,7 @@ def dashboard_home(request):
 #  PRODUCT LIST
 # ─────────────────────────────────────────────
 
-@login_required(login_url='dashboard_login')
+@staff_required
 def product_list(request):
     products = Door.objects.all()
 
@@ -212,7 +212,7 @@ def product_list(request):
 #  PRODUCT ADD
 # ─────────────────────────────────────────────
 
-@login_required(login_url='dashboard_login')
+@staff_required
 def product_add(request):
     if request.method == 'POST':
         form = DoorProductForm(request.POST, request.FILES)
@@ -249,7 +249,7 @@ def product_add(request):
 #  PRODUCT EDIT
 # ─────────────────────────────────────────────
 
-@login_required(login_url='dashboard_login')
+@staff_required
 def product_edit(request, pk):
     product = get_object_or_404(Door, pk=pk)
 
@@ -294,7 +294,7 @@ def product_edit(request, pk):
 #  PRODUCT DELETE
 # ─────────────────────────────────────────────
 
-@login_required(login_url='dashboard_login')
+@staff_required
 @require_POST
 def product_delete(request, pk):
     product = get_object_or_404(Door, pk=pk)
@@ -330,7 +330,7 @@ def product_delete(request, pk):
 #  IMAGE MANAGEMENT
 # ─────────────────────────────────────────────
 
-@login_required(login_url='dashboard_login')
+@staff_required
 @require_POST
 def remove_image(request, pk, slot):
     """Remove a specific image slot from a product."""
@@ -372,7 +372,7 @@ def remove_image(request, pk, slot):
 #  INQUIRY MANAGEMENT
 # ─────────────────────────────────────────────
 
-@login_required(login_url='dashboard_login')
+@staff_required
 def inquiry_list(request):
     inquiries = Inquiry.objects.select_related('door').all()
 
@@ -406,7 +406,7 @@ def inquiry_list(request):
     return render(request, 'dashboard/inquiry_list.html', context)
 
 
-@login_required(login_url='dashboard_login')
+@staff_required
 @require_POST
 def inquiry_update_status(request, pk):
     inquiry = get_object_or_404(Inquiry, pk=pk)
