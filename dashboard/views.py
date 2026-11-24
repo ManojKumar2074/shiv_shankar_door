@@ -1,6 +1,4 @@
-import os
 import logging
-import shutil
 
 from django.core.cache import cache
 from django.shortcuts import render, get_object_or_404, redirect
@@ -10,7 +8,6 @@ from django.db.models import Q, Count
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.conf import settings
 from django.utils import timezone
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -319,16 +316,37 @@ def product_delete(request, pk):
     product = get_object_or_404(Door, pk=pk)
     name = product.name
 
-    # Remove door's media folder
-    door_dir = os.path.join(
-        settings.MEDIA_ROOT,
-        'doors',
-        f'door_{pk}'
-    )
+    # Collect unique image files before deleting the database record.
+    images_to_delete = []
+    seen_images = set()
 
-    if os.path.exists(door_dir):
-        shutil.rmtree(door_dir, ignore_errors=True)
+    for field_name in ('image_main', 'image_2', 'image_3', 'image_4'):
+        image = getattr(product, field_name)
 
+        if image and image.name:
+            storage = image.storage
+            storage_name = image.name
+            image_key = (id(storage), storage_name)
+
+            if image_key not in seen_images:
+                seen_images.add(image_key)
+                images_to_delete.append(
+                    (storage, storage_name, field_name)
+                )
+
+    # Delete files through Django's storage backend.
+    for storage, storage_name, field_name in images_to_delete:
+        try:
+            storage.delete(storage_name)
+        except Exception:
+            logger.exception(
+                'Could not delete %s for door pk=%s, storage_name=%s',
+                field_name,
+                pk,
+                storage_name,
+            )
+
+    # Delete the database record.
     product.delete()
 
     messages.success(
@@ -352,7 +370,7 @@ def product_delete(request, pk):
 @staff_required
 @require_POST
 def remove_image(request, pk, slot):
-    """Remove a specific image slot from a product."""
+    """Remove a secondary image through Django's storage backend."""
 
     product = get_object_or_404(Door, pk=pk)
 
@@ -371,17 +389,40 @@ def remove_image(request, pk, slot):
             status=400
         )
 
-    field = getattr(product, field_name)
+    # The main image is required.
+    if field_name == 'image_main':
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'The main photo is required. Upload a new one to replace it.'
+            },
+            status=400,
+        )
 
-    if field:
-        # Delete the actual file
+    image = getattr(product, field_name)
+
+    if image and image.name:
         try:
-            if os.path.exists(field.path):
-                os.remove(field.path)
+            image.storage.delete(image.name)
+
         except Exception:
-            pass
+            logger.exception(
+                'Could not remove image for door pk=%s, field=%s, storage_name=%s',
+                pk,
+                field_name,
+                image.name,
+            )
+
+            return JsonResponse(
+                {
+                    'success': False,
+                    'error': 'Could not remove the image. Please try again.'
+                },
+                status=500,
+            )
 
         setattr(product, field_name, None)
+
         product.save(update_fields=[field_name])
 
     return JsonResponse({'success': True})

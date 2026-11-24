@@ -1,11 +1,16 @@
+import os
+import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse
-from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+
+from doors.models import Door
 
 from . import views
 
@@ -153,3 +158,177 @@ class LoginThrottleTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 429)
+
+
+class DoorImageCleanupTests(TestCase):
+
+    def setUp(self):
+        User.objects.create_user(
+            username='owner',
+            password='pass-12345',
+            is_staff=True,
+        )
+
+        self.client.login(
+            username='owner',
+            password='pass-12345',
+        )
+
+    def fake_image(self, name):
+        return SimpleUploadedFile(
+            name,
+            b'\x89PNG\r\n\x1a\n' + b'0' * 64,
+            content_type='image/png',
+        )
+
+    def make_door(self):
+        door = Door.objects.create(
+            name='Cleanup test',
+            category='bedroom',
+            material='hard_wood',
+            description='Test door',
+            height='80',
+            width='30',
+            thickness='35',
+            finish_type='matte',
+            image_main=self.fake_image('main.png'),
+            image_2=self.fake_image('second.png'),
+            image_3=self.fake_image('third.png'),
+            image_4=self.fake_image('fourth.png'),
+        )
+
+        return door
+
+    def test_delete_removes_all_image_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=tmp):
+
+                door = self.make_door()
+
+                image_paths = [
+                    door.image_main.path,
+                    door.image_2.path,
+                    door.image_3.path,
+                    door.image_4.path,
+                ]
+
+                self.assertTrue(
+                    all(os.path.exists(path) for path in image_paths)
+                )
+
+                response = self.client.post(
+                    reverse('dashboard_product_delete', args=[door.pk])
+                )
+
+                self.assertEqual(response.status_code, 302)
+
+                self.assertFalse(
+                    Door.objects.filter(pk=door.pk).exists()
+                )
+
+                for path in image_paths:
+                    self.assertFalse(os.path.exists(path))
+
+    def test_delete_preserves_ajax_response(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=tmp):
+
+                door = self.make_door()
+
+                response = self.client.post(
+                    reverse('dashboard_product_delete', args=[door.pk]),
+                    HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+                )
+
+                self.assertEqual(response.status_code, 200)
+
+                self.assertEqual(
+                    response.json(),
+                    {
+                        'success': True,
+                        'message': '"Cleanup test" deleted.'
+                    }
+                )
+
+    def test_remove_secondary_image(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=tmp):
+
+                door = self.make_door()
+
+                image_path = door.image_2.path
+
+                response = self.client.post(
+                    reverse(
+                        'dashboard_remove_image',
+                        args=[door.pk, '2']
+                    )
+                )
+
+                self.assertEqual(response.status_code, 200)
+
+                door.refresh_from_db()
+
+                self.assertFalse(door.image_2)
+                self.assertFalse(os.path.exists(image_path))
+
+    def test_main_image_cannot_be_removed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=tmp):
+
+                door = self.make_door()
+
+                image_path = door.image_main.path
+
+                response = self.client.post(
+                    reverse(
+                        'dashboard_remove_image',
+                        args=[door.pk, 'main']
+                    )
+                )
+
+                self.assertEqual(response.status_code, 400)
+
+                self.assertFalse(response.json()['success'])
+
+                door.refresh_from_db()
+
+                self.assertTrue(door.image_main)
+                self.assertTrue(os.path.exists(image_path))
+
+    def test_invalid_slot_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=tmp):
+                door = self.make_door()
+
+                response = self.client.post(
+                    reverse(
+                        'dashboard_remove_image',
+                        args=[door.pk, '9']
+                    )
+                )
+
+                self.assertEqual(response.status_code, 400)
+
+    def test_storage_failure_preserves_image_reference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=tmp):
+                door = self.make_door()
+                factory = RequestFactory()
+                request = factory.post(
+                    reverse('dashboard_remove_image', args=[door.pk, '2'])
+                )
+                request.user = User.objects.get(username='owner')
+
+                with patch.object(
+                    door.image_2.storage,
+                    'delete',
+                    side_effect=OSError('Storage unavailable'),
+                ), patch('dashboard.views.logger.exception'):
+                    response = views.remove_image(request, door.pk, '2')
+
+                self.assertEqual(response.status_code, 500)
+
+                door.refresh_from_db()
+
+                self.assertTrue(door.image_2)
