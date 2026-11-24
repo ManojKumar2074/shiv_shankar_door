@@ -9,6 +9,7 @@ from django.db.models import Q, Min, Max
 from django.contrib import messages
 from django.http import JsonResponse
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 import os
 import uuid
@@ -18,6 +19,12 @@ from .models import Door, Inquiry, DoorPreview
 from .forms import InquiryForm, ContactForm, PreviewRequestForm
 
 logger = logging.getLogger(__name__)
+
+MAX_UPLOADED_HOUSE_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_EXISTING_PRODUCT_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_IMAGE_INPUT_PIXELS = 40_000_000
+MAX_IMAGE_PROCESSING_PIXELS = 8_000_000
+MAX_IMAGE_DIMENSION = 10_000
 
 
 # ── Home Page ─────────────────────────────────────────────────────────────────
@@ -262,6 +269,136 @@ def ai_preview(request):
 
     return render(request, 'doors/ai_preview.html', context)
 
+def _read_image_from_storage(
+    image_field,
+    max_compressed_bytes=MAX_UPLOADED_HOUSE_IMAGE_BYTES,
+    max_input_pixels=MAX_IMAGE_INPUT_PIXELS,
+    max_processing_pixels=MAX_IMAGE_PROCESSING_PIXELS,
+    max_dimension=MAX_IMAGE_DIMENSION,
+):
+    """
+    Read an image through Django storage without requiring
+    a local filesystem path.
+
+    Metadata and compressed-size checks run before OpenCV decoding.
+    Oversized decoded inputs are rejected; oversized processing inputs
+    are downscaled to a bounded resolution.
+    """
+    import io
+    import cv2
+    import numpy as np
+    from PIL import Image, UnidentifiedImageError
+
+    if not image_field or not image_field.name:
+        return None
+
+    try:
+        storage = image_field.storage
+        image_name = image_field.name
+
+        file_size = None
+        if hasattr(image_field, 'size'):
+            try:
+                file_size = image_field.size
+            except Exception:
+                file_size = None
+        if file_size is None and hasattr(storage, 'size'):
+            try:
+                file_size = storage.size(image_name)
+            except Exception:
+                file_size = None
+
+        if (
+            max_compressed_bytes is not None
+            and file_size is not None
+            and file_size > max_compressed_bytes
+        ):
+            return None
+
+        with storage.open(image_name, 'rb') as image_file:
+            chunks = []
+            total_size = 0
+            chunk_size = 64 * 1024
+
+            while True:
+                if max_compressed_bytes is not None:
+                    remaining = (max_compressed_bytes + 1) - total_size
+                    if remaining <= 0:
+                        return None
+                    to_read = min(chunk_size, remaining)
+                else:
+                    to_read = chunk_size
+
+                chunk = image_file.read(to_read)
+                if not chunk:
+                    break
+
+                chunks.append(chunk)
+                total_size += len(chunk)
+
+                if max_compressed_bytes is not None and total_size > max_compressed_bytes:
+                    return None
+
+        if total_size == 0:
+            return None
+
+        image_data = b''.join(chunks)
+
+        try:
+            with Image.open(io.BytesIO(image_data)) as pil_image:
+                width, height = pil_image.size
+        except (UnidentifiedImageError, OSError, ValueError):
+            return None
+
+        if width < 1 or height < 1:
+            return None
+
+        if max_dimension is not None and (width > max_dimension or height > max_dimension):
+            return None
+
+        if max_input_pixels is not None and width * height > max_input_pixels:
+            return None
+
+        image_array = np.frombuffer(image_data, dtype=np.uint8)
+        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return None
+
+        height, width = image.shape[:2]
+        if max_input_pixels is not None and height * width > max_input_pixels:
+            return None
+
+        if max_processing_pixels is not None and height * width > max_processing_pixels:
+            scale = (max_processing_pixels / float(height * width)) ** 0.5
+            target_width = max(1, int(width * scale))
+            target_height = max(1, int(height * scale))
+
+            while target_width * target_height > max_processing_pixels and (
+                target_width > 1 or target_height > 1
+            ):
+                if target_width > 1:
+                    target_width -= 1
+                if target_height > 1 and target_width * target_height > max_processing_pixels:
+                    target_height -= 1
+
+            interpolation = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR
+            image = cv2.resize(
+                image,
+                (target_width, target_height),
+                interpolation=interpolation,
+            )
+
+            if image is None or image.size == 0:
+                return None
+
+        return image
+
+    except Exception:
+        logger.exception("Failed to read image from Django storage")
+        return None
+
+
 # ── CV Helper: Remove White Background ───────────────────────────────────────
 def remove_white_background(door_img):
     """
@@ -285,31 +422,32 @@ def remove_white_background(door_img):
     door_bgra = cv2.cvtColor(door_img, cv2.COLOR_BGR2BGRA)
 
     # Step 1: Create white pixel mask (all channels > 220)
-    b, g, r   = door_img[:, :, 0], door_img[:, :, 1], door_img[:, :, 2]
-    white_mask = ((b > 220) & (g > 220) & (r > 220)).astype(np.uint8) * 255
+    flood_mask = cv2.inRange(door_img, (221, 221, 221), (255, 255, 255))
 
     # Step 2: Flood fill from image corners to find edge-connected background
-    h, w            = white_mask.shape
-    flood_mask      = white_mask.copy()
+    h, w = flood_mask.shape
     flood_fill_mask = np.zeros((h + 2, w + 2), np.uint8)
 
     for pt in [(0, 0), (0, w - 1), (h - 1, 0), (h - 1, w - 1)]:
-        if white_mask[pt[0], pt[1]] == 255:
+        if flood_mask[pt[0], pt[1]] == 255:
             cv2.floodFill(flood_mask, flood_fill_mask, (pt[1], pt[0]), 128)
 
     # Pixels marked 128 are confirmed background (connected to image edges)
-    bg_mask = (flood_mask == 128).astype(np.uint8) * 255
+    bg_mask = np.empty_like(flood_mask)
+    cv2.compare(flood_mask, 128, cv2.CMP_EQ, dst=bg_mask)
 
     # Step 3: Dilate mask to cover fringe/anti-aliased edge pixels
-    kernel  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    bg_mask = cv2.dilate(bg_mask, kernel, iterations=1)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    cv2.dilate(bg_mask, kernel, dst=bg_mask, iterations=1)
 
     # Step 4: Blur mask edges for smooth transparency transition
-    bg_soft = cv2.GaussianBlur(bg_mask.astype(np.float32), (5, 5), 0)
+    bg_soft = bg_mask.astype(np.float32)
+    cv2.GaussianBlur(bg_soft, (5, 5), 0, dst=bg_soft)
 
     # Step 5: Apply alpha — invert so background=0, door=255
-    alpha              = np.clip(255 - bg_soft, 0, 255).astype(np.uint8)
-    door_bgra[:, :, 3] = alpha
+    np.subtract(255.0, bg_soft, out=bg_soft)
+    np.clip(bg_soft, 0, 255, out=bg_soft)
+    door_bgra[:, :, 3] = bg_soft.astype(np.uint8)
 
     return door_bgra
 
@@ -319,117 +457,189 @@ def process_door_preview(preview, rect):
     """
     Composite a door image onto a house photo using OpenCV.
 
-    Steps:
-    1. Load house and door images from disk
-    2. Convert rect percentages → actual pixel coordinates
-    3. Remove white background from door image (get BGRA)
-    4. Tight-crop door to remove transparent padding
-    5. Resize door to fill the drawn rectangle
-    6. Match door brightness to the house ROI for realism
-    7. Alpha composite: blend door over house using door's alpha channel
-    8. Save result as JPEG and return relative path
-
-    Args:
-        preview : DoorPreview model instance (has house_image and door FK)
-        rect    : dict with x, y, w, h as floats (0.0–100.0 = % of image)
+    Images are read and written through Django storage.
+    No direct filesystem paths are required.
 
     Returns:
-        str  : relative path to saved result image (e.g. 'previews/result/xxx.jpg')
-        None : if processing fails for any reason
+        str: Storage-relative filename.
+        None: If processing fails.
     """
-    try:
-        import cv2
-        import numpy as np
 
-        # Load images from disk
-        house_path = preview.house_image.path
-        door_path  = preview.door.image_main.path
-        house_img  = cv2.imread(house_path)
-        door_img   = cv2.imread(door_path)
+    import cv2
+    import numpy as np
+    import uuid
+
+    saved_name = None
+    candidate_name = None
+    storage = preview.preview_image.storage
+
+    try:
+        # Step 1: Load images through Django storage.
+        house_img = _read_image_from_storage(
+            preview.house_image,
+            max_compressed_bytes=MAX_UPLOADED_HOUSE_IMAGE_BYTES,
+            max_input_pixels=MAX_IMAGE_INPUT_PIXELS,
+            max_processing_pixels=MAX_IMAGE_PROCESSING_PIXELS,
+            max_dimension=MAX_IMAGE_DIMENSION,
+        )
+
+        door_img = _read_image_from_storage(
+            preview.door.image_main,
+            max_compressed_bytes=MAX_EXISTING_PRODUCT_IMAGE_BYTES,
+            max_input_pixels=MAX_IMAGE_INPUT_PIXELS,
+            max_processing_pixels=MAX_IMAGE_PROCESSING_PIXELS,
+            max_dimension=MAX_IMAGE_DIMENSION,
+        )
 
         if house_img is None or door_img is None:
-            return None  # Could not read one of the images
+            return None
 
         h_height, h_width = house_img.shape[:2]
 
-        # Convert percentage rect → pixel coordinates
+        # Step 2: Convert percentages into pixel coordinates.
         px = int((rect['x'] / 100.0) * h_width)
         py = int((rect['y'] / 100.0) * h_height)
         pw = int((rect['w'] / 100.0) * h_width)
         ph = int((rect['h'] / 100.0) * h_height)
 
-        # Clamp coordinates to stay within image bounds
-        px = max(0, min(px, h_width - 1))
-        py = max(0, min(py, h_height - 1))
-        pw = max(10, min(pw, h_width - px))
-        ph = max(10, min(ph, h_height - py))
+        # Reject invalid rectangles instead of silently changing them.
+        if (
+            px < 0 or py < 0 or
+            pw < 1 or ph < 1 or
+            px + pw > h_width or
+            py + ph > h_height
+        ):
+            return None
 
-        # Step 1: Remove white background → BGRA door image
+        # Step 3: Remove white background.
         door_bgra = remove_white_background(door_img)
 
-        # Step 2: Tight crop — remove transparent padding around door
-        # This prevents the door from appearing small inside a padded box
-        alpha_ch        = door_bgra[:, :, 3]
-        non_transparent = np.where(alpha_ch > 10)
-        if len(non_transparent[0]) > 0 and len(non_transparent[1]) > 0:
-            y_min = int(non_transparent[0].min())
-            y_max = int(non_transparent[0].max())
-            x_min = int(non_transparent[1].min())
-            x_max = int(non_transparent[1].max())
-            pad   = 2  # Small padding so edges aren't clipped
-            y_min = max(0, y_min - pad)
-            y_max = min(door_bgra.shape[0] - 1, y_max + pad)
-            x_min = max(0, x_min - pad)
-            x_max = min(door_bgra.shape[1] - 1, x_max + pad)
-            door_bgra = door_bgra[y_min:y_max + 1, x_min:x_max + 1]
+        if door_bgra is None:
+            return None
 
-        # Step 3: Resize door to fill the user-drawn rectangle
-        door_resized = cv2.resize(door_bgra, (pw, ph), interpolation=cv2.INTER_LANCZOS4)
+        # Step 4: Crop transparent padding.
+        alpha_ch = door_bgra[:, :, 3]
+        _, visible_mask = cv2.threshold(alpha_ch, 10, 255, cv2.THRESH_BINARY)
+        x, y, w, h = cv2.boundingRect(visible_mask)
 
-        # Step 4: Brightness matching — make door fit the lighting of the scene
-        result     = house_img.copy()
-        roi        = result[py:py + ph, px:px + pw]
-        door_rgb   = door_resized[:, :, :3]
-        door_alpha = door_resized[:, :, 3].astype(np.float32) / 255.0
+        if w == 0 or h == 0:
+            return None
 
-        # Sample only non-transparent pixels for accurate brightness comparison
-        door_gray  = cv2.cvtColor(door_rgb, cv2.COLOR_BGR2GRAY).astype(np.float32)
-        roi_gray   = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY).astype(np.float32)
-        door_pixels = door_gray[door_alpha > 0.5]
-        roi_pixels  = roi_gray[door_alpha > 0.5]
+        y_min = max(0, y - 2)
+        y_max = min(door_bgra.shape[0], y + h + 2)
 
-        if len(door_pixels) > 0 and len(roi_pixels) > 0:
-            door_mean        = np.mean(door_pixels) + 1e-6
-            roi_mean         = np.mean(roi_pixels) + 1e-6
-            brightness_ratio = float(roi_mean / door_mean)
-            # Clamp ratio to avoid extreme over/under exposure
-            brightness_ratio = max(0.55, min(brightness_ratio, 1.8))
-        else:
-            brightness_ratio = 1.0  # No adjustment if sampling failed
+        x_min = max(0, x - 2)
+        x_max = min(door_bgra.shape[1], x + w + 2)
 
-        door_adjusted = np.clip(
-            door_rgb.astype(np.float32) * brightness_ratio, 0, 255
-        ).astype(np.uint8)
+        door_bgra = door_bgra[y_min:y_max, x_min:x_max]
 
-        # Step 5: Alpha composite — blend door over house pixel by pixel
-        # Formula: output = door * alpha + house * (1 - alpha)
-        alpha_3ch  = np.stack([door_alpha, door_alpha, door_alpha], axis=2)
-        roi_f      = roi.astype(np.float32)
-        door_f     = door_adjusted.astype(np.float32)
-        composited = door_f * alpha_3ch + roi_f * (1.0 - alpha_3ch)
-        result[py:py + ph, px:px + pw] = composited.astype(np.uint8)
+        # Step 5: Resize door.
+        door_resized = cv2.resize(
+            door_bgra,
+            (pw, ph),
+            interpolation=cv2.INTER_LANCZOS4
+        )
 
-        # Step 6: Save result image to disk
-        result_dir      = os.path.join(settings.MEDIA_ROOT, 'previews', 'result')
-        os.makedirs(result_dir, exist_ok=True)
-        result_filename  = f"preview_{uuid.uuid4().hex[:8]}.jpg"
-        result_full_path = os.path.join(result_dir, result_filename)
-        cv2.imwrite(result_full_path, result, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        # Step 6: Brightness matching.
+        roi = house_img[py:py + ph, px:px + pw]
+        door_rgb = door_resized[:, :, :3]
 
-        return f"previews/result/{result_filename}"
+        door_gray = cv2.cvtColor(door_rgb, cv2.COLOR_BGR2GRAY)
+        roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+
+        door_sum = 0.0
+        roi_sum = 0.0
+        visible_count = 0
+
+        chunk_rows = 256
+        for row_start in range(0, ph, chunk_rows):
+            row_end = min(row_start + chunk_rows, ph)
+            alpha_chunk = door_resized[row_start:row_end, :, 3] > 127
+            if not np.any(alpha_chunk):
+                continue
+
+            door_chunk_gray = door_gray[row_start:row_end]
+            roi_chunk_gray = roi_gray[row_start:row_end]
+
+            visible_count += int(np.count_nonzero(alpha_chunk))
+            door_sum += float(door_chunk_gray[alpha_chunk].sum(dtype=np.float64))
+            roi_sum += float(roi_chunk_gray[alpha_chunk].sum(dtype=np.float64))
+
+        brightness_ratio = 1.0
+        if visible_count > 0:
+            door_mean = (door_sum / visible_count) + 1e-6
+            roi_mean = (roi_sum / visible_count) + 1e-6
+            brightness_ratio = max(0.55, min(roi_mean / door_mean, 1.8))
+
+        # Step 7: Alpha compositing (row chunks to limit peak memory).
+        for row_start in range(0, ph, chunk_rows):
+            row_end = min(row_start + chunk_rows, ph)
+
+            door_rgb_chunk = door_resized[row_start:row_end, :, :3].astype(np.float32)
+            alpha_chunk = (
+                door_resized[row_start:row_end, :, 3:4].astype(np.float32) / 255.0
+            )
+            roi_chunk = roi[row_start:row_end].astype(np.float32)
+
+            np.multiply(door_rgb_chunk, brightness_ratio, out=door_rgb_chunk)
+            np.clip(door_rgb_chunk, 0, 255, out=door_rgb_chunk)
+
+            blended = (
+                door_rgb_chunk * alpha_chunk
+                + roi_chunk * (1.0 - alpha_chunk)
+            )
+
+            roi[row_start:row_end] = blended.astype(np.uint8)
+
+        # Step 8: Encode JPEG in memory.
+        success, encoded_image = cv2.imencode(
+            '.jpg',
+            house_img,
+            [cv2.IMWRITE_JPEG_QUALITY, 92]
+        )
+
+        if not success:
+            raise RuntimeError("OpenCV JPEG encoding failed")
+
+        # Step 9: Save through Django storage.
+        filename = f"preview_{uuid.uuid4().hex}.jpg"
+        candidate_name = f"previews/result/{filename}"
+
+        saved_name = storage.save(
+            candidate_name,
+            ContentFile(encoded_image.tobytes())
+        )
+
+        if not saved_name:
+            raise RuntimeError("Preview storage returned no filename")
+
+        return saved_name
 
     except Exception:
-        return None  # Silently fail — caller shows user-friendly error
+        logger.exception(
+            "Door preview processing failed for preview pk=%s",
+            preview.pk
+        )
+
+        cleanup_names = []
+        if candidate_name:
+            cleanup_names.append(candidate_name)
+        if saved_name and saved_name not in cleanup_names:
+            cleanup_names.append(saved_name)
+
+        for name in cleanup_names:
+            try:
+                if hasattr(storage, 'exists') and storage.exists(name):
+                    storage.delete(name)
+                elif not hasattr(storage, 'exists'):
+                    storage.delete(name)
+            except Exception:
+                logger.exception(
+                    "Failed to clean up generated preview file: %s",
+                    name,
+                )
+
+        return None
 
 
 # ── About Page ────────────────────────────────────────────────────────────────
