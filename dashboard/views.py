@@ -2,6 +2,7 @@ import os
 import logging
 import shutil
 
+from django.core.cache import cache
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
@@ -21,6 +22,9 @@ from .models import DashboardSession
 
 
 logger = logging.getLogger(__name__)
+
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCK_SECONDS = 15 * 60
 
 
 # ─────────────────────────────────────────────
@@ -45,10 +49,20 @@ def dashboard_login(request):
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
+        throttle_key = f'dash-login:{username.lower()[:150]}'
+
+        attempts = cache.get(throttle_key, 0)
+        if attempts >= LOGIN_MAX_ATTEMPTS:
+            messages.error(
+                request,
+                'Too many failed login attempts. Please try again in 15 minutes.',
+            )
+            return render(request, 'dashboard/login.html', status=429)
 
         user = authenticate(request, username=username, password=password)
 
         if user and user.is_staff:
+            cache.delete(throttle_key)
             login(request, user)
 
             # Log successful dashboard login
@@ -69,6 +83,11 @@ def dashboard_login(request):
             return redirect(_safe_next_url(request))
 
         else:
+            cache.add(throttle_key, 0, LOGIN_LOCK_SECONDS)
+            try:
+                cache.incr(throttle_key)
+            except ValueError:
+                cache.set(throttle_key, 1, LOGIN_LOCK_SECONDS)
             messages.error(
                 request,
                 'Invalid credentials or insufficient permissions.'
