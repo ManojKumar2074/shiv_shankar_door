@@ -12,9 +12,12 @@ from django.conf import settings
 from django.core.paginator import Paginator
 import os
 import uuid
+import logging
 
 from .models import Door, Inquiry, DoorPreview
-from .forms import InquiryForm, ContactForm
+from .forms import InquiryForm, ContactForm, PreviewRequestForm
+
+logger = logging.getLogger(__name__)
 
 
 # ── Home Page ─────────────────────────────────────────────────────────────────
@@ -186,66 +189,78 @@ def ai_preview(request):
     """
     Renders the AI preview tool page.
 
-    On GET  : Shows the tool with door selector and upload area.
-    On POST : Processes the uploaded house photo + drawn rectangle,
-              overlays the selected door onto the house image using
-              OpenCV, and returns the before/after result.
-
-    Rectangle coordinates are sent as percentages (0–100) of the
-    displayed image size, then converted to actual pixels server-side.
+    Validates all POST data before saving anything.
+    Cleans up uploaded and generated files if processing fails.
     """
-    doors         = Door.objects.all()
+    doors = Door.objects.all()
     preview_result = None
-    error_msg      = None
 
     if request.method == 'POST':
-        door_id     = request.POST.get('door_id')
-        house_image = request.FILES.get('house_image')
+        form = PreviewRequestForm(request.POST, request.FILES)
 
-        # Rectangle coordinates from canvas drawing (as % of image size)
-        rect_x = request.POST.get('rect_x')
-        rect_y = request.POST.get('rect_y')
-        rect_w = request.POST.get('rect_w')
-        rect_h = request.POST.get('rect_h')
+        if form.is_valid():
+            door = form.cleaned_data['door_id']
+            house_image = form.cleaned_data['house_image']
 
-        # Validate required inputs
-        if not door_id or not house_image:
-            error_msg = 'Please upload a photo and select a door.'
-        elif not all([rect_x, rect_y, rect_w, rect_h]):
-            error_msg = 'Please draw a rectangle on your photo to mark where the door is.'
-        else:
-            door    = get_object_or_404(Door, pk=door_id)
-            preview = DoorPreview(door=door, house_image=house_image)
+            rect = {
+                'x': form.cleaned_data['rect_x'],
+                'y': form.cleaned_data['rect_y'],
+                'w': form.cleaned_data['rect_w'],
+                'h': form.cleaned_data['rect_h'],
+            }
+
+            preview = DoorPreview(
+                door=door,
+                house_image=house_image,
+            )
             preview.save()
 
             try:
-                # Convert string percentages to float dict
-                rect = {
-                    'x': float(rect_x),
-                    'y': float(rect_y),
-                    'w': float(rect_w),
-                    'h': float(rect_h),
-                }
                 result_path = process_door_preview(preview, rect)
+
                 if result_path:
                     preview.preview_image = result_path
                     preview.save()
                     preview_result = preview
                 else:
-                    error_msg = 'Preview generation failed. Please try again with a clearer photo.'
-            except Exception as e:
-                error_msg = f'Preview generation failed: {str(e)}'
+                    logger.warning(
+                        'AI preview returned no result for door pk=%s',
+                        door.pk,
+                    )
+                    messages.error(
+                        request,
+                        'Preview generation failed. Please try again with a clearer photo.',
+                    )
 
-        if error_msg:
-            messages.error(request, error_msg)
+            except Exception:
+                logger.exception(
+                    'AI preview failed for door pk=%s',
+                    door.pk,
+                )
+                messages.error(
+                    request,
+                    'Preview generation failed. Please try again with a clearer photo.',
+                )
+
+            if preview_result is None:
+                if preview.preview_image:
+                    preview.preview_image.delete(save=False)
+
+                preview.house_image.delete(save=False)
+                preview.delete()
+
+        else:
+            for field_errors in form.errors.values():
+                for error in field_errors:
+                    messages.error(request, error)
 
     context = {
-        'doors':             doors,
-        'preview_result':    preview_result,
+        'doors': doors,
+        'preview_result': preview_result,
         'whatsapp_float_url': f"https://wa.me/{getattr(settings, 'WHATSAPP_NUMBER', '')}",
     }
-    return render(request, 'doors/ai_preview.html', context)
 
+    return render(request, 'doors/ai_preview.html', context)
 
 # ── CV Helper: Remove White Background ───────────────────────────────────────
 def remove_white_background(door_img):

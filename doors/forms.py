@@ -134,3 +134,70 @@ class DoorProductForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class PreviewRequestForm(forms.Form):
+    """Validates everything the AI-preview endpoint receives from the browser."""
+
+    MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+    MAX_PIXELS = 40_000_000
+    ALLOWED_FORMATS = {'JPEG', 'PNG', 'WEBP'}
+
+    door_id = forms.ModelChoiceField(
+        queryset=Door.objects.all(),
+        error_messages={
+            'required': 'Please select a door.',
+            'invalid_choice': 'That door does not exist.',
+        },
+    )
+
+    house_image = forms.ImageField(
+        error_messages={
+            'required': 'Please upload a photo of your entrance.',
+            'invalid_image': 'Please upload a valid JPG, PNG or WebP photo.',
+        },
+    )
+
+    rect_x = forms.FloatField(min_value=0, max_value=100)
+    rect_y = forms.FloatField(min_value=0, max_value=100)
+    rect_w = forms.FloatField(min_value=1, max_value=100)
+    rect_h = forms.FloatField(min_value=1, max_value=100)
+
+    def clean_house_image(self):
+        f = self.cleaned_data['house_image']
+
+        if f.size > self.MAX_UPLOAD_BYTES:
+            raise forms.ValidationError(
+                'Photo is too large. Maximum size is 10 MB.'
+            )
+
+        img = f.image
+
+        if img.format not in self.ALLOWED_FORMATS:
+            raise forms.ValidationError(
+                'Only JPG, PNG or WebP photos are supported.'
+            )
+
+        if img.width * img.height > self.MAX_PIXELS:
+            raise forms.ValidationError(
+                'Photo resolution is too high. Please upload a smaller photo.'
+            )
+
+        f.seek(0)
+        return f
+
+    def clean(self):
+        data = super().clean()
+
+        try:
+            if (
+                data['rect_x'] + data['rect_w'] > 100
+                or data['rect_y'] + data['rect_h'] > 100
+            ):
+                raise forms.ValidationError(
+                    'The marked area must stay inside the photo.'
+                )
+        except KeyError:
+            pass
+
+        return data
