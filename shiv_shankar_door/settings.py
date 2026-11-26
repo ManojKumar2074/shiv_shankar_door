@@ -23,7 +23,52 @@ RENDER_HOST = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 
 if RENDER_HOST and RENDER_HOST not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RENDER_HOST)
-    
+
+# ── Production HTTPS and Security ────────────────────────
+
+ON_RENDER = (
+    os.environ.get('RENDER', '').lower() == 'true'
+    or bool(RENDER_HOST)
+)
+
+PRODUCTION_SECURITY = (
+    os.environ.get(
+        'PRODUCTION_SECURITY',
+        str(ON_RENDER)
+    ).lower() == 'true'
+)
+
+if PRODUCTION_SECURITY:
+
+    # Trust HTTPS forwarded by Render's proxy.
+    SECURE_PROXY_SSL_HEADER = (
+        'HTTP_X_FORWARDED_PROTO',
+        'https'
+    )
+
+    # Redirect HTTP requests to HTTPS.
+    SECURE_SSL_REDIRECT = (
+        os.environ.get('SECURE_SSL_REDIRECT', 'True').lower()
+        == 'true'
+    )
+
+    # Secure session and CSRF cookies.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # Start with one hour of HSTS.
+    SECURE_HSTS_SECONDS = int(
+        os.environ.get('SECURE_HSTS_SECONDS', '3600')
+    )
+
+    # Trust HTTPS origins for CSRF protection.
+    CSRF_TRUSTED_ORIGINS = [
+        f'https://{host}'
+        for host in ALLOWED_HOSTS
+        if host not in ('*', 'localhost', '127.0.0.1')
+        and not host.startswith('.')
+    ]
+
 # ── Applications ─────────────────────────────────────────
 INSTALLED_APPS = [
     'django.contrib.admin',
