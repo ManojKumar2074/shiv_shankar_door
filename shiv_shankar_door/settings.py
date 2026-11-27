@@ -1,11 +1,19 @@
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # ── Security ──────────────────────────────────────────────
-SECRET_KEY = os.environ['SECRET_KEY']
+SECRET_KEY = os.environ.get('SECRET_KEY')
+
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        'The SECRET_KEY environment variable is required. '
+        'Set it in Render (Environment tab) or in your local shell.'
+    )
 
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
@@ -258,3 +266,41 @@ LOGIN_REDIRECT_URL = '/dashboard/'
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
+
+# ── Logging ──────────────────────────────────────────────
+# Send application errors to stdout so Render captures them.
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+
+    'formatters': {
+        'simple': {
+            'format': (
+                '%(asctime)s %(levelname)s '
+                '%(name)s: %(message)s'
+            ),
+        },
+    },
+
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+
+    'root': {
+        'handlers': ['console'],
+        'level': os.environ.get('LOG_LEVEL', 'INFO'),
+    },
+
+    'loggers': {
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}
